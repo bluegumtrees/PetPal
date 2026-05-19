@@ -3,6 +3,7 @@ fastapi>=0.110.0
 uvicorn[standard]>=0.27.0
 python-dotenv>=1.0.0
 pydantic>=2.5.0
+sqlmodel>=0.0.14
 
 # ===== P1: RAG =====
 sentence-transformers>=2.7.0
