@@ -11,10 +11,20 @@ rank-bm25>=0.2.2
 jieba>=0.42.1
 
 # ===== P2+: VLM / Agent =====
-# openai>=1.30.0
-# python-multipart>=0.0.9
-# Pillow>=10.0.0
+openai>=1.30.0
+python-multipart>=0.0.9
+Pillow>=10.0.0
 
 # ===== P5+: maps & scheduling =====
-# requests>=2.31.0
+requests>=2.31.0
 APScheduler>=3.10.0
+
+# ===== P1.5: KB 翻译抓取 =====
+beautifulsoup4>=4.12.0
+lxml>=5.0.0
+
+# ===== P6.2: timezone 支持 (Windows + Linux 都需要) =====
+tzdata>=2024.1
+
+# ===== P1: 知识库 ingest（解析 YAML frontmatter） =====
+PyYAML>=6.0.1
