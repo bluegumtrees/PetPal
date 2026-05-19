@@ -1,0 +1,213 @@
+# PetPal Retriever 评测测试集（P7）
+#
+# 30 条 query：10 条原 KB（01-11，防退化） + 20 条新 KB（12-15，验证 P1.5）
+# gt = ground truth chunk ids，每个 query 1-2 条相关条目
+# hit@k 按 "any of gt 出现在 top_k" 算
+
+queries:
+  # ===== 原 KB 防退化（10 条） =====
+  - id: q01
+    query: "我家猫昨天吐了一次，正常吗"
+    tags: [猫, 消化, 原KB]
+    gt:
+      - "01_symptoms_digestive::症状-呕吐-偶发一次性"
+
+  - id: q02
+    query: "狗突然像在咳什么东西又咳不出来连续好几声"
+    tags: [狗, 呼吸, 原KB]
+    gt:
+      - "02_symptoms_respiratory::症状-反向喷嚏"
+
+  - id: q03
+    query: "狗一直挠皮肤，红红的还有疙瘩"
+    tags: [狗, 皮肤, 原KB]
+    gt:
+      - "03_symptoms_skin::症状-皮肤-持续瘙痒"
+      - "03_symptoms_skin::症状-皮肤-红疹丘疹"
+
+  - id: q04
+    query: "猫一只眼睛一直流泪"
+    tags: [猫, 眼耳, 原KB]
+    gt:
+      - "04_symptoms_eye_ear::症状-眼睛-单眼流泪"
+
+  - id: q05
+    query: "宠物体型 BCS 8 分什么意思"
+    tags: [BCS, 原KB]
+    gt:
+      - "06_bcs_scoring::BCS-8/9-很胖"
+
+  - id: q06
+    query: "幼犬第一针疫苗什么时候打"
+    tags: [疫苗, 原KB]
+    gt:
+      - "07_vaccine_deworming::程序-幼犬疫苗时间表"
+
+  - id: q07
+    query: "狗误食了一块巧克力怎么办"
+    tags: [中毒, 急诊, 原KB]
+    gt:
+      - "08_emergency_first_aid::中毒-巧克力"
+
+  - id: q08
+    query: "一天该给猫喂多少粮"
+    tags: [日常, 原KB]
+    gt:
+      - "09_daily_care::护理-喂食量计算"
+
+  - id: q09
+    query: "猫一直舔自己是不是焦虑"
+    tags: [行为, 原KB]
+    gt:
+      - "10_behavior_emotion::行为-应激反应"
+      - "10_behavior_emotion::行为-强迫行为"
+
+  - id: q10
+    query: "金毛容易得什么病"
+    tags: [品种, 原KB]
+    gt:
+      - "11_breed_basics::品种-犬-金毛寻回"
+
+  # ===== 新 KB 验证 P1.5（20 条） =====
+
+  # B 慢性病 / 老年高发（5）
+  - id: q11
+    query: "猫慢性肾病早期会有什么症状"
+    tags: [慢性, CKD, 新KB-B]
+    gt:
+      - "12_chronic_senior::老年-CKD-早期信号"
+
+  - id: q12
+    query: "老年猫甲亢怎么治"
+    tags: [慢性, 甲亢, 新KB-B]
+    gt:
+      - "12_chronic_senior::甲亢-治疗选择"
+
+  - id: q13
+    query: "老年狗心衰用什么药"
+    tags: [慢性, 心衰, 新KB-B]
+    gt:
+      - "12_chronic_senior::心衰-治疗-药物与营养"
+
+  - id: q14
+    query: "狗骨关节炎吃什么药"
+    tags: [慢性, 关节, 新KB-B]
+    gt:
+      - "12_chronic_senior::骨关节炎-治疗-药物与手术"
+
+  - id: q15
+    query: "狗得了白内障能治好吗"
+    tags: [慢性, 眼, 新KB-B]
+    gt:
+      - "12_chronic_senior::晶状体-白内障-治疗与管理"
+
+  # C 消化 / 食物相关（5）
+  - id: q16
+    query: "狗食物过敏怎么诊断"
+    tags: [消化, 过敏, 新KB-C]
+    gt:
+      - "13_digestive_food::食物过敏-诊断-排除试验"
+
+  - id: q17
+    query: "猫吐了好几个月一直不好"
+    tags: [消化, 慢性呕吐, 新KB-C]
+    gt:
+      - "13_digestive_food::呕吐-长期或严重-猫"
+
+  - id: q18
+    query: "猫脂肪肝怎么治"
+    tags: [消化, 肝病, 新KB-C]
+    gt:
+      - "13_digestive_food::肝病-脂肪肝-治疗与预后"
+      - "13_digestive_food::肝病-脂肪肝-症状与诊断"
+
+  - id: q19
+    query: "狗胰腺炎什么表现"
+    tags: [消化, 胰腺炎, 新KB-C]
+    gt:
+      - "13_digestive_food::胰腺炎-犬-常见症状"
+
+  - id: q20
+    query: "狗肚子里有蛔虫怎么办"
+    tags: [消化, 寄生虫, 新KB-C]
+    gt:
+      - "13_digestive_food::寄生虫-蛔虫-传染与控制"
+      - "13_digestive_food::寄生虫-蛔虫-感染症状"
+
+  # D 行为（5）
+  - id: q21
+    query: "狗分离焦虑怎么治"
+    tags: [行为, 分离焦虑, 新KB-D]
+    gt:
+      - "14_behavior_msd::行为-分离焦虑-症状与处理"
+
+  - id: q22
+    query: "猫坐车一直吐怎么办"
+    tags: [行为, 晕车, 新KB-D]
+    gt:
+      - "14_behavior_msd::治疗-晕车-药物干预"
+      - "14_behavior_msd::治疗-晕车-药物选择"
+
+  - id: q23
+    query: "狗有攻击性怎么处理"
+    tags: [行为, 攻击, 新KB-D]
+    gt:
+      - "14_behavior_msd::行为-攻击性行为-常见类型"
+      - "14_behavior_msd::行为-攻击性-常见类型"
+
+  - id: q24
+    query: "小奶狗社会化关键期"
+    tags: [行为, 幼犬, 新KB-D]
+    gt:
+      - "14_behavior_msd::行为-狗的社会化-关键时期"
+
+  - id: q25
+    query: "猫为什么乱尿喷尿"
+    tags: [行为, 排泄, 新KB-D]
+    gt:
+      - "14_behavior_msd::行为-排泄问题-常见类型"
+      - "14_behavior_msd::行为-排泄问题-处理方法"
+
+  # E 急诊 / 严重感染（5）
+  - id: q26
+    query: "狗吃了腐烂的肉抽搐瘫痪"
+    tags: [中毒, 神经, 新KB-E]
+    gt:
+      - "15_emergency_infectious::中毒-肉毒-神经症状"
+
+  - id: q27
+    query: "狗身上发现蜱虫又开始瘫痪"
+    tags: [急诊, 蜱虫, 新KB-E]
+    gt:
+      - "15_emergency_infectious::蜱虫瘫痪-治疗与护理"
+      - "15_emergency_infectious::蜱虫瘫痪-早期症状-识别"
+
+  - id: q28
+    query: "心丝虫怎么预防"
+    tags: [感染, 心丝虫, 新KB-E]
+    gt:
+      - "15_emergency_infectious::心丝虫-预防措施"
+      - "15_emergency_infectious::预防-心丝虫-猫的预防措施"
+
+  - id: q29
+    query: "狗得 Lyme 病有什么症状"
+    tags: [感染, Lyme, 新KB-E]
+    gt:
+      - "15_emergency_infectious::症状-Lyme病-常见表现"
+
+  - id: q30
+    query: "猫狂犬病会不会传染给人"
+    tags: [感染, 狂犬, 新KB-E]
+    gt:
+      - "15_emergency_infectious::狂犬病-人类感染风险-猫"
+
+  # ===== OOK 故意刁难（2 条，gt=[] 期望 retriever 给低分；测 robustness） =====
+  - id: q31
+    query: "我家鹦鹉打喷嚏怎么办"
+    tags: [OOK, 非猫狗]
+    gt: []  # KB 只覆盖猫狗，鹦鹉不应硬召回
+
+  - id: q32
+    query: "怎么训练宠物猪上厕所"
+    tags: [OOK, 非猫狗]
+    gt: []

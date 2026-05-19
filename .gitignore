@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+.env
+*.egg-info/
+.pytest_cache/
+
+# Node / Vite
+node_modules/
+web/dist/
+web/.vite/
+*.log
+.npm/
+.pnpm-store/
+
+# Data
+data/chroma/
+data/uploads/
+data/vet_kb/_review/
+*.sqlite
+*.sqlite-journal
+*.db
+
+# IDE / 工具配置
+.vscode/
+.idea/
+.claude/
+*.swp
+.DS_Store
+
+# OS
+Thumbs.db
+desktop.ini

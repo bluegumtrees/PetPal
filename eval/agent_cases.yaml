@@ -1,0 +1,77 @@
+# PetPal Agent end-to-end light eval（P7 Step B）
+#
+# 10 条文字 only case，N=10 单次跑，LLM 非确定性参考价值有限。
+# 跑：python eval/eval_agent.py
+
+pet_id: 3  # 小肥 (cat) — db 里现有 pet
+
+cases:
+  - id: a01
+    query: "我家猫昨晚吐了 3 次都是黄水，今天没什么精神"
+    expected:
+      task: [symptom]
+      tools_required: [retrieve_vet_knowledge, save_pet_event]
+      final_contains: [呕吐, 兽医]
+
+  - id: a02
+    query: "我家狗一直拉稀 3 天了，便里有血，怎么办"
+    expected:
+      task: [symptom]
+      tools_required: [retrieve_vet_knowledge, save_pet_event]
+      final_contains: [腹泻, 就医]
+
+  - id: a03
+    query: "我家狗刚才误食了一整块巧克力，大概 30 分钟前"
+    expected:
+      task: [symptom]
+      tools_required: [retrieve_vet_knowledge, save_pet_event]
+      final_contains: [巧克力, 立即]
+
+  - id: a04
+    query: "老猫得了慢性肾病早期会有什么症状"
+    expected:
+      task: [symptom, chat]
+      tools_required: [retrieve_vet_knowledge]
+      final_contains: [肾]
+
+  - id: a05
+    query: "狗分离焦虑怎么治"
+    expected:
+      task: [symptom, chat]
+      tools_required: [retrieve_vet_knowledge]
+      final_contains: [焦虑]
+
+  - id: a06
+    query: "提醒我下周二上午 9 点给小肥打猫三联，以后每年提醒一次"
+    expected:
+      task: [chat]
+      tools_required: [schedule_reminder]
+      final_contains: [提醒]
+
+  - id: a07
+    query: "记一下小肥今天称了 8.5 公斤"
+    expected:
+      task: [chat]
+      tools_required: [save_pet_event]
+      final_contains: [体重, 公斤, kg, 记录, 8.5]  # any-of
+
+  - id: a08
+    query: "我在北京海淀，帮我找附近 24 小时宠物急诊"
+    expected:
+      task: [symptom, chat]
+      tools_required: [find_nearby_clinic]
+      final_contains: [医院]
+
+  - id: a09
+    query: "家附近哪里有宠物医院"
+    expected:
+      task: [chat, symptom]
+      tools_forbidden: [find_nearby_clinic]  # 模糊地址不该硬调
+      final_contains: [地址, 位置, 具体, 城市, 哪里]  # any-of — 容忍同义表达
+
+  - id: a10
+    query: "我家猫今天好可爱啊"
+    expected:
+      task: [chat]
+      tools_forbidden: [retrieve_vet_knowledge, save_pet_event, find_nearby_clinic, schedule_reminder]
+      final_contains: []  # 不强检查关键词
