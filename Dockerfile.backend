@@ -8,6 +8,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# 换 apt 源到阿里云镜像（国内 Debian 官方源慢）
+RUN if [ -f /etc/apt/sources.list.d/debian.sources ]; then \
+        sed -i 's|deb.debian.org|mirrors.aliyun.com|g; s|security.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources; \
+    elif [ -f /etc/apt/sources.list ]; then \
+        sed -i 's|deb.debian.org|mirrors.aliyun.com|g; s|security.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list; \
+    fi
+
 # 系统依赖（sentence-transformers 需要 gcc，Pillow 需要 libjpeg）
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential gcc libjpeg-dev zlib1g-dev \
