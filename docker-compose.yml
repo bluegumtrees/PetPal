@@ -10,9 +10,7 @@ services:
     environment:
       - PETPAL_DEV_MODE=0   # 生产关掉 dev trigger_now
     volumes:
-      - ./data/uploads:/app/data/uploads      # 用户上传图片持久化
-      - ./data/petpal.db:/app/data/petpal.db  # SQLite 持久化
-      - ./data/chroma:/app/data/chroma        # 向量索引 + BM25 持久化
+      - ./data:/app/data  # 整个 data 目录持久化（含 vet_kb + uploads + petpal.db + chroma）
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
