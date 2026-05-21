@@ -22,7 +22,7 @@ from apscheduler.triggers.date import DateTrigger
 from sqlmodel import Session, select
 
 from app.db.database import _engine
-from app.db.models import Pet, Reminder
+from app.db.models import Pet, Reminder, User
 from app.services.email import build_reminder_email, send_reminder_email
 
 log = logging.getLogger(__name__)
@@ -66,6 +66,14 @@ async def trigger_reminder(reminder_id: int, delayed_reason: Optional[str] = Non
         pet = session.get(Pet, r.pet_id)
         pet_name = pet.name if pet else '宠物'
 
+        # V2: 收件人 = pet.user.email（per-user 通知）。
+        # 跳过 demo 账号（demo@petpal.local 不是真邮箱）和无 email 的用户 → 走 dry_run
+        recipient_email: Optional[str] = None
+        if pet and pet.user_id:
+            user = session.get(User, pet.user_id)
+            if user and user.email and not user.is_demo:
+                recipient_email = user.email
+
         scheduled_local_str = _format_local(r.scheduled_at)
         subject, body = build_reminder_email(
             pet_name=pet_name,
@@ -74,7 +82,7 @@ async def trigger_reminder(reminder_id: int, delayed_reason: Optional[str] = Non
             scheduled_at_local=scheduled_local_str,
             delayed=bool(delayed_reason),
         )
-        result = send_reminder_email(subject, body)
+        result = send_reminder_email(subject, body, to=recipient_email)
 
         r.notified = True
         r.notification_channel = result['channel']

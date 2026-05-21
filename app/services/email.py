@@ -38,7 +38,10 @@ _REMINDER_TYPE_LABEL = {
 
 
 def is_smtp_configured() -> bool:
-    return all(os.getenv(k) for k in ('SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'ALERT_TO'))
+    """SMTP 服务凭证齐全即视为已配置。
+    V2 起 recipient 从 user.email 取（per-user），ALERT_TO 仅 V1 兼容 fallback，不再是必需。
+    """
+    return all(os.getenv(k) for k in ('SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS'))
 
 
 def build_reminder_email(
@@ -85,14 +88,15 @@ def send_reminder_email(subject: str, body: str, to: Optional[str] = None) -> di
         'to': recipient,
     }
 
-    if not is_smtp_configured():
+    if not is_smtp_configured() or not recipient:
+        reason = 'SMTP not configured' if not is_smtp_configured() else 'no recipient (user has no email / demo / fallback ALERT_TO unset)'
         print('=' * 60)
-        print(f'[email/dry-run] to={recipient or "<unset>"}')
+        print(f'[email/dry-run] to={recipient or "<unset>"} reason={reason}')
         print(f'subject: {subject}')
         print('body:')
         print(body)
         print('=' * 60)
-        return {**base, 'channel': 'dry_run'}
+        return {**base, 'channel': 'dry_run', 'dry_run_reason': reason}
 
     host = os.getenv('SMTP_HOST') or ''
     port = int(os.getenv('SMTP_PORT') or 465)
