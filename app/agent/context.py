@@ -78,7 +78,7 @@ def build_pet_context(
             except json.JSONDecodeError:
                 payload = {}
             payload_str = json.dumps(payload, ensure_ascii=False) if payload else '{}'
-            lines.append(f'  - {e.happened_at:%Y-%m-%d} [{e.event_type}] {payload_str}')
+            lines.append(f'  - id={e.id} {e.happened_at:%Y-%m-%d} [{e.event_type}] {payload_str}')
     else:
         lines.append('')
         lines.append('暂无事件记录。')
@@ -89,12 +89,15 @@ def build_pet_context(
 def format_vlm_block(vlm_output: dict, task: str, label: str | None = None) -> str:
     """把 VLM 输出格式化为可读文本块。
 
-    label: 自定义块标题；不传则默认"图片 VLM 分析结果"。
-        历史 VLM 注入时建议传 "历史 VLM 分析（参考用，本轮主人未上传新图）"。
+    label: 自定义块标题；不传则默认"你看到的图片"。
+        历史 VLM 注入时建议传 "你之前看到的图片（参考用，本轮主人未上传新图）"。
     """
     if not vlm_output or vlm_output.get('_error'):
         return ''
-    header = label or f'图片 VLM 分析结果（task={task}）'
+    if label:
+        header = f'{label}，task={task}'
+    else:
+        header = f'你看到的图片（自动视觉分析，task={task}）'
     lines = [f'\n{header}：']
     lines.append(json.dumps(vlm_output, ensure_ascii=False, indent=2))
     return '\n'.join(lines)

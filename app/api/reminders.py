@@ -14,8 +14,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlmodel import Session, select
 
+from app.auth.deps import ensure_pet_owned_by, get_current_user
 from app.db.database import get_session
-from app.db.models import Pet, Reminder
+from app.db.models import Pet, Reminder, User
 from app.services.email import _REMINDER_TYPE_LABEL  # type: ignore
 from app.services.scheduler import (
     add_reminder_job,
@@ -83,11 +84,9 @@ def _row_to_out(r: Reminder) -> ReminderOut:
     )
 
 
-def _ensure_pet(pet_id: int, session: Session) -> Pet:
-    pet = session.get(Pet, pet_id)
-    if not pet or pet.deleted_at:
-        raise HTTPException(404, f'pet {pet_id} not found')
-    return pet
+def _ensure_pet(pet_id: int, user: User, session: Session) -> Pet:
+    """V2: 检查 pet 归属当前 user，否则 404。"""
+    return ensure_pet_owned_by(pet_id, user, session)
 
 
 def _build_preview_subject(pet_name: str, reminder_type: str) -> str:
@@ -103,8 +102,9 @@ async def list_reminders(
     include_notified: bool = Query(True, description='是否包含已触发的'),
     limit: int = Query(100, ge=1, le=500),
     session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
 ):
-    _ensure_pet(pet_id, session)
+    _ensure_pet(pet_id, user, session)
     stmt = select(Reminder).where(Reminder.pet_id == pet_id)
     if not include_notified:
         stmt = stmt.where(Reminder.notified == False)  # noqa: E712
@@ -113,10 +113,14 @@ async def list_reminders(
 
 
 @router.post('', response_model=ReminderOut)
-async def create_reminder(data: ReminderCreate, session: Session = Depends(get_session)):
+async def create_reminder(
+    data: ReminderCreate,
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
     if data.reminder_type not in ALLOWED_TYPES:
         raise HTTPException(400, f'reminder_type must be one of {sorted(ALLOWED_TYPES)}')
-    pet = _ensure_pet(data.pet_id, session)
+    pet = _ensure_pet(data.pet_id, user, session)
     scheduled_utc = _to_naive_utc(data.scheduled_at)
 
     r = Reminder(
@@ -140,10 +144,15 @@ async def create_reminder(data: ReminderCreate, session: Session = Depends(get_s
 
 
 @router.delete('/{reminder_id}')
-async def delete_reminder(reminder_id: int, session: Session = Depends(get_session)):
+async def delete_reminder(
+    reminder_id: int,
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
     r = session.get(Reminder, reminder_id)
     if not r:
         raise HTTPException(404, 'reminder not found')
+    _ensure_pet(r.pet_id, user, session)  # 验证 reminder 所属 pet 归当前 user
     remove_reminder_job(reminder_id)
     session.delete(r)
     session.commit()
@@ -151,7 +160,11 @@ async def delete_reminder(reminder_id: int, session: Session = Depends(get_sessi
 
 
 @router.post('/{reminder_id}/trigger_now')
-async def trigger_now_endpoint(reminder_id: int, session: Session = Depends(get_session)):
+async def trigger_now_endpoint(
+    reminder_id: int,
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
     """dev-only：立即触发一条 reminder（演示用）。
 
     需要 env PETPAL_DEV_MODE=1 才允许调用，避免生产环境被乱触发。
@@ -161,6 +174,7 @@ async def trigger_now_endpoint(reminder_id: int, session: Session = Depends(get_
     r = session.get(Reminder, reminder_id)
     if not r:
         raise HTTPException(404, 'reminder not found')
+    _ensure_pet(r.pet_id, user, session)  # 验证归属
     if r.notified:
         raise HTTPException(400, 'reminder already triggered')
     result = await scheduler_trigger_now(reminder_id)

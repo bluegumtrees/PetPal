@@ -7,6 +7,7 @@ import {
   AssistantThinking,
   UserMessage,
 } from '../components/MessageCard'
+import SessionList from '../components/SessionList'
 import TaskBadge from '../components/TaskBadge'
 import ToolCallCard from '../components/ToolCallCard'
 import VLMCard from '../components/VLMCard'
@@ -69,8 +70,9 @@ const QUICK_PROMPTS = [
 
 export default function Chat() {
   const { activePet, pets, loading: petsLoading } = usePets()
-  const { sessionId, newSession } = useSession(activePet?.id)
+  const { sessionId, newSession, switchTo } = useSession(activePet?.id)
   const toast = useToast()
+  const [showHistory, setShowHistory] = useState(false)
 
   /** @type {[UIBlock[], Function]} */
   const [blocks, setBlocks] = useState([])
@@ -125,8 +127,8 @@ export default function Chat() {
             if (m.tool_calls && m.tool_calls.length > 0) {
               for (let i = 0; i < m.tool_calls.length; i++) {
                 const tc = m.tool_calls[i]
-                // 历史里的 duplicate/skipped 也不展示（同实时流逻辑）
-                if (tc.result?.duplicate === true || tc.result?.skipped === true) {
+                // 历史里的 duplicate/skipped/cached 也不展示（同实时流逻辑）
+                if (tc.result?.duplicate === true || tc.result?.skipped === true || tc.result?.cached === true) {
                   continue
                 }
                 restored.push({
@@ -271,8 +273,8 @@ export default function Chat() {
               ])
             } else if (t === 'tool_result') {
               const key = runningToolIds[ev.tool + '-' + ev.iter]
-              // duplicate / skipped 视觉噪声——直接从 UI 移除（数据已审计在 db）
-              const isNoise = ev.result?.duplicate === true || ev.result?.skipped === true
+              // duplicate / skipped / cached 视觉噪声——直接从 UI 移除（数据已审计在 db）
+              const isNoise = ev.result?.duplicate === true || ev.result?.skipped === true || ev.result?.cached === true
               if (isNoise) {
                 setBlocks((b) => b.filter((x) => x.id !== 'tc-' + key))
               } else {
@@ -362,7 +364,7 @@ export default function Chat() {
   return (
     <div className="flex flex-col" style={{ minHeight: 'calc(100vh - 60px - 60px)' }}>
       {/* session 工具栏 */}
-      <div className="flex items-center gap-3 mb-4 pb-3 border-b border-slate-200">
+      <div className="relative flex items-center gap-3 mb-4 pb-3 border-b border-slate-200">
         <Avatar pet={activePet} size={36} />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-slate-700">{activePet.name}</p>
@@ -372,12 +374,43 @@ export default function Chat() {
         </div>
         <button
           type="button"
+          data-session-list-trigger
+          onClick={() => setShowHistory((v) => !v)}
+          disabled={isStreaming}
+          className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-50 disabled:opacity-40 transition"
+        >
+          📜 历史
+        </button>
+        <button
+          type="button"
           onClick={handleNewSession}
           disabled={isStreaming}
           className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-50 disabled:opacity-40 transition"
         >
           + 新对话
         </button>
+
+        {showHistory && activePet && (
+          <SessionList
+            petId={activePet.id}
+            currentSessionId={sessionId}
+            onSelect={(sid) => {
+              if (isStreaming) {
+                toast('请等当前对话完成', { kind: 'error' })
+                return
+              }
+              switchTo(sid)
+              setBlocks([])
+            }}
+            onClose={() => setShowHistory(false)}
+            onCurrentDeleted={() => {
+              // 删的是当前会话：开一个新空白会话
+              newSession()
+              setBlocks([])
+              toast('当前对话已删除，已开新对话', { kind: 'success' })
+            }}
+          />
+        )}
       </div>
 
       {/* 消息流 */}

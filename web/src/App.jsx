@@ -1,11 +1,16 @@
 import { Outlet, Route, Routes } from 'react-router-dom'
 import Header from './components/Header'
+import ProtectedRoute from './components/ProtectedRoute'
+import { AuthProvider } from './context/AuthContext'
+import { PetProvider } from './context/PetContext'
 import Chat from './pages/Chat'
 import Dashboard from './pages/Dashboard'
-import PetList from './pages/PetList'
-import PetForm from './pages/PetForm'
-import PetDetail from './pages/PetDetail'
 import DevVetSearch from './pages/DevVetSearch'
+import Login from './pages/Login'
+import PetDetail from './pages/PetDetail'
+import PetForm from './pages/PetForm'
+import PetList from './pages/PetList'
+import Register from './pages/Register'
 
 function Layout() {
   return (
@@ -30,17 +35,32 @@ function NotFound() {
 
 export default function App() {
   return (
-    <Routes>
-      <Route element={<Layout />}>
-        <Route index element={<Chat />} />
-        <Route path="dashboard" element={<Dashboard />} />
-        <Route path="pets" element={<PetList />} />
-        <Route path="pets/new" element={<PetForm />} />
-        <Route path="pets/:id" element={<PetDetail />} />
-        <Route path="pets/:id/edit" element={<PetForm />} />
-        <Route path="dev/vet-search" element={<DevVetSearch />} />
-        <Route path="*" element={<NotFound />} />
-      </Route>
-    </Routes>
+    <AuthProvider>
+      <PetProvider>
+        <Routes>
+          {/* 公开路由 */}
+          <Route path="login" element={<Login />} />
+          <Route path="register" element={<Register />} />
+
+          {/* 受保护路由（包 Layout + ProtectedRoute） */}
+          <Route
+            element={
+              <ProtectedRoute>
+                <Layout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<Chat />} />
+            <Route path="dashboard" element={<Dashboard />} />
+            <Route path="pets" element={<PetList />} />
+            <Route path="pets/new" element={<PetForm />} />
+            <Route path="pets/:id" element={<PetDetail />} />
+            <Route path="pets/:id/edit" element={<PetForm />} />
+            <Route path="dev/vet-search" element={<DevVetSearch />} />
+            <Route path="*" element={<NotFound />} />
+          </Route>
+        </Routes>
+      </PetProvider>
+    </AuthProvider>
   )
 }

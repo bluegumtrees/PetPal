@@ -2,7 +2,6 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { ToastProvider } from './components/Toast'
-import { PetProvider } from './context/PetContext'
 import './index.css'
 import App from './App.jsx'
 
@@ -10,9 +9,7 @@ createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>
       <ToastProvider>
-        <PetProvider>
-          <App />
-        </PetProvider>
+        <App />
       </ToastProvider>
     </BrowserRouter>
   </StrictMode>,

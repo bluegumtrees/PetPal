@@ -1,4 +1,4 @@
-"""4 表 SQLModel：pets / pet_events / reminders / chat_sessions。"""
+"""5 表 SQLModel：users / pets / pet_events / reminders / chat_sessions。"""
 from __future__ import annotations
 
 from datetime import date, datetime
@@ -11,11 +11,25 @@ def _now() -> datetime:
     return datetime.now()
 
 
+class User(SQLModel, table=True):
+    """V2 用户表（邮箱 + bcrypt 密码 hash）。"""
+    __tablename__ = 'users'
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    email: str = Field(..., max_length=120, index=True, unique=True)
+    password_hash: str = Field(..., max_length=200)  # bcrypt
+    name: str = Field(..., max_length=50)  # 显示名
+    is_demo: bool = Field(default=False, index=True)  # demo 账号特殊标记
+    created_at: datetime = Field(default_factory=_now)
+
+
 class Pet(SQLModel, table=True):
     """宠物档案（软删：deleted_at != null 视为已删除）。"""
     __tablename__ = 'pets'
 
     id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[int] = Field(default=None, foreign_key='users.id', index=True)
+    # V2 加；Optional 是为了允许迁移期间历史数据先 NULL，后由迁移脚本回填
 
     # 必填
     name: str = Field(..., max_length=50, index=True)
@@ -90,6 +104,8 @@ class ChatSession(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     session_id: str = Field(..., max_length=36, index=True)  # 客户端生成的 UUID
     pet_id: Optional[int] = Field(default=None, foreign_key='pets.id', index=True)
+    user_id: Optional[int] = Field(default=None, foreign_key='users.id', index=True)
+    # V2 冗余字段（pet.user_id 也能 join 到）加速 query + 支持迁移期 null
 
     role: str = Field(..., max_length=20)  # 'user' / 'assistant' / 'tool'
     content: str

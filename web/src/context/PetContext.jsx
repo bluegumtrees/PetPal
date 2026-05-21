@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { api } from '../api'
+import { useAuth } from './AuthContext'
 
 /**
  * @typedef {Object} Pet
@@ -34,6 +35,8 @@ const PetContext = createContext(null)
 const STORAGE_KEY = 'petpal.activePetId'
 
 export function PetProvider({ children }) {
+  const { user, loading: authLoading } = useAuth()
+
   /** @type {[Pet[], Function]} */
   const [pets, setPets] = useState([])
   /** @type {[number|null, Function]} */
@@ -56,7 +59,6 @@ export function PetProvider({ children }) {
     try {
       const data = await api('/api/pets')
       setPets(data)
-      // 如果 active 还在列表里，不动；否则选第一只；空就清空
       if (data.length === 0) {
         setActivePetId(null)
       } else {
@@ -68,13 +70,20 @@ export function PetProvider({ children }) {
     } finally {
       setLoading(false)
     }
-    // 故意只在 mount 时执行，后续靠手动调 reload；activePetId 通过 setter 维护
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // V2: 仅在已登录时 fetch；切账号自动重新加载
   useEffect(() => {
+    if (authLoading) return  // 等 AuthProvider 决断
+    if (!user) {
+      setPets([])
+      setActivePetId(null)
+      setLoading(false)
+      return
+    }
     reload()
-  }, [reload])
+  }, [user?.id, authLoading, reload])
 
   const activePet = pets.find((p) => p.id === activePetId) ?? null
 

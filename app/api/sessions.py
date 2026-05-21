@@ -13,8 +13,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlmodel import Session, func, select
 
+from app.auth.deps import ensure_pet_owned_by, get_current_user
 from app.db.database import get_session
-from app.db.models import ChatSession
+from app.db.models import ChatSession, User
 
 router = APIRouter(prefix='/api/sessions', tags=['sessions'])
 
@@ -75,8 +76,10 @@ async def list_sessions(
     pet_id: int = Query(...),
     limit: int = Query(20, ge=1, le=100),
     session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
 ):
     """该宠物历史 session 概要列表（按最近活跃倒序）。"""
+    ensure_pet_owned_by(pet_id, user, session)
     # 聚合：每个 session_id 的消息数 + 最早/最晚时间
     stmt = (
         select(
@@ -86,6 +89,7 @@ async def list_sessions(
             func.max(ChatSession.created_at).label('last_at'),
         )
         .where(ChatSession.pet_id == pet_id)
+        .where(ChatSession.user_id == user.id)  # 二次过滤防 pet_id 偷换
         .where(ChatSession.session_id.is_not(None))
         .group_by(ChatSession.session_id)
         .order_by(func.max(ChatSession.created_at).desc())
@@ -118,6 +122,7 @@ async def list_sessions(
 async def get_session_messages(
     session_id: str,
     session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
 ):
     """加载某 session 全部消息（按时间正序）。"""
     rows = session.exec(
@@ -128,6 +133,9 @@ async def get_session_messages(
     if not rows:
         # session 不存在或没消息 → 返回空数组（不是 404，因为客户端可能拿新建的 UUID）
         return []
+    # 检查归属：任何一条 row 的 user_id 不是当前用户 → 拒绝
+    if any(r.user_id is not None and r.user_id != user.id for r in rows):
+        raise HTTPException(404, 'session not found')
     return [_row_to_msg(r) for r in rows]
 
 
@@ -135,11 +143,15 @@ async def get_session_messages(
 async def delete_session(
     session_id: str,
     session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
 ):
     """删除某 session 全部消息（用户主动重置）。"""
     rows = session.exec(
         select(ChatSession).where(ChatSession.session_id == session_id)
     ).all()
+    # 检查归属
+    if any(r.user_id is not None and r.user_id != user.id for r in rows):
+        raise HTTPException(404, 'session not found')
     for r in rows:
         session.delete(r)
     session.commit()

@@ -1,10 +1,33 @@
 /**
- * 统一 fetch 封装。
+ * 统一 fetch 封装 + JWT 自动注入。
  * 用法：
  *   const pets = await api('/api/pets')
  *   const pet  = await api('/api/pets', { method: 'POST', body: {...} })
  *   const pet  = await uploadFile('/api/pets/1/avatar', file)
+ *
+ * V2: 自动从 localStorage 拿 petpal_token 加到 Authorization header；
+ *     401 时清 token + 跳 /login（除 /api/auth/* 自身）。
  */
+
+const TOKEN_KEY = 'petpal_token'
+
+export function getToken() {
+  return localStorage.getItem(TOKEN_KEY)
+}
+
+export function setToken(token) {
+  if (token) localStorage.setItem(TOKEN_KEY, token)
+  else localStorage.removeItem(TOKEN_KEY)
+}
+
+function _on401() {
+  // 清 token + 跳 login（保留当前路径用于回跳）
+  setToken(null)
+  const from = window.location.pathname + window.location.search
+  if (!from.startsWith('/login') && !from.startsWith('/register')) {
+    window.location.assign(`/login?from=${encodeURIComponent(from)}`)
+  }
+}
 
 /**
  * @param {string} path
@@ -18,12 +41,20 @@ export async function api(path, opts = {}) {
     signal,
     cache: 'no-store',
   }
+  // 自动加 JWT Bearer
+  const token = getToken()
+  if (token && !init.headers['Authorization']) {
+    init.headers['Authorization'] = `Bearer ${token}`
+  }
   if (body !== undefined) {
     init.headers['Content-Type'] = 'application/json'
     init.body = JSON.stringify(body)
   }
   const res = await fetch(path, init)
   if (!res.ok) {
+    if (res.status === 401 && !path.startsWith('/api/auth/')) {
+      _on401()
+    }
     let detail = `HTTP ${res.status}`
     try {
       const err = await res.json()
@@ -46,8 +77,12 @@ export async function api(path, opts = {}) {
 export async function uploadFile(path, file) {
   const form = new FormData()
   form.append('file', file)
-  const res = await fetch(path, { method: 'POST', body: form })
+  const headers = {}
+  const token = getToken()
+  if (token) headers['Authorization'] = `Bearer ${token}`
+  const res = await fetch(path, { method: 'POST', body: form, headers })
   if (!res.ok) {
+    if (res.status === 401) _on401()
     const err = await res.json().catch(() => ({}))
     throw new Error(err.detail || `HTTP ${res.status}`)
   }
@@ -70,13 +105,19 @@ export async function streamChat({ petId, sessionId, text, image }, onEvent, sig
   form.append('text', text || '')
   if (image) form.append('image', image)
 
+  const headers = {}
+  const token = getToken()
+  if (token) headers['Authorization'] = `Bearer ${token}`
+
   const res = await fetch('/api/agent/chat/stream', {
     method: 'POST',
     body: form,
+    headers,
     signal,
   })
 
   if (!res.ok) {
+    if (res.status === 401) _on401()
     const err = await res.json().catch(() => ({}))
     throw new Error(err.detail || `HTTP ${res.status}`)
   }

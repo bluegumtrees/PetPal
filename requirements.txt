@@ -29,3 +29,8 @@ tzdata>=2024.1
 
 # ===== P1: 知识库 ingest（解析 YAML frontmatter） =====
 PyYAML>=6.0.1
+
+# ===== V2: user auth (JWT + bcrypt) =====
+PyJWT>=2.8.0
+bcrypt>=4.0.0
+email-validator>=2.1.0

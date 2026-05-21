@@ -74,6 +74,7 @@ def encode_image(image_path: str | Path, max_size: int = 1024,
 
 class SymptomResult(BaseModel):
     observation: str
+    visible_details: list[str] = []  # 结构化罗列图中所有临床相关细节
     possible_symptoms: list[str]
     severity: Literal['low', 'medium', 'high']
     urgency: Literal['routine', 'within_24h', 'emergency']
@@ -138,10 +139,16 @@ TASK_SCHEMA: dict[Task, type[BaseModel]] = {
 # ============ Prompts ============
 
 SYMPTOM_PROMPT = """你是一位经验丰富的临床兽医。根据宠物照片识别可能的健康问题。
+你的视觉描述会被下游 LLM 当作"它自己看到的图"用来回答主人——**所以观察要详细具体，不要简略**。
 
 严格按以下 JSON schema 输出（字段名英文，内容中文）：
 {
-  "observation": "对图片中观察到的客观描述（1-2 句）",
+  "observation": "对图片观察的详细客观描述（3-5 句，覆盖所见部位、颜色、形状、数量、对称性、与周围/正常状态的对比等具体特征）",
+  "visible_details": [
+    "按需罗列图中所有临床相关细节（每条一短句，越具体越好）",
+    "例如：部位 X 的颜色/形状/大小；分泌物 / 排泄物的颜色 / 质地 / 量；体表异常（红肿/脱毛/伤口）；姿态异常；周围环境；左右对称性；与正常状态的差异",
+    "下游 LLM 会基于这些细节给主人具体建议——细节越多，回答越有用"
+  ],
   "possible_symptoms": ["症状1", "症状2"],
   "severity": "low | medium | high",
   "urgency": "routine | within_24h | emergency",
@@ -150,10 +157,12 @@ SYMPTOM_PROMPT = """你是一位经验丰富的临床兽医。根据宠物照片
 }
 
 要求：
-1. severity 反映医学严重度；urgency 反映就医时间窗
-2. 不要捏造症状，看不到的不要说
-3. 急诊红线（呕血、便血、呼吸困难、抽搐、休克体征）一律 severity=high + urgency=emergency
-4. 若图中是无症状的健康宠物或非动物物体，possible_symptoms 给空数组，severity=low
+1. **observation 必须详细**（至少 3 句），不要只写 1 句话
+2. **visible_details 至少 3 条**——只要图里有东西就罗列出来；图里啥都没有（如纯白背景）才允许少于 3 条
+3. severity 反映医学严重度；urgency 反映就医时间窗
+4. 不要捏造，看不到的不要说；看不见的部位明确标注"不可见"
+5. 急诊红线（呕血、便血、呼吸困难、抽搐、休克体征）一律 severity=high + urgency=emergency
+6. 若图中是无症状的健康宠物或非动物物体，possible_symptoms 给空数组，severity=low（但 observation 和 visible_details 仍要描述图中看到的东西）
 """
 
 EMOTION_PROMPT = """你是资深的猫狗行为学家（Feline / Canine Behaviorist）。

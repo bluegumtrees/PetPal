@@ -12,7 +12,7 @@ const STORAGE_KEY = 'petpal.sessions'
 
 /**
  * @param {number|null} petId
- * @returns {{ sessionId: string|null, newSession: () => string }}
+ * @returns {{ sessionId: string|null, newSession: () => string, switchTo: (sid: string) => void }}
  */
 export default function useSession(petId) {
   const [sessionId, setSessionId] = useState(null)
@@ -44,7 +44,16 @@ export default function useSession(petId) {
     return fresh
   }, [petId])
 
-  return { sessionId, newSession }
+  /** 切到历史 session（不创建新的，从 SessionList 选了某条历史时用）。 */
+  const switchTo = useCallback((newSessionId) => {
+    if (!petId || !newSessionId) return
+    const map = readMap()
+    map[petId] = newSessionId
+    writeMap(map)
+    setSessionId(newSessionId)
+  }, [petId])
+
+  return { sessionId, newSession, switchTo }
 }
 
 function readMap() {

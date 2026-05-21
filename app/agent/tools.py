@@ -110,11 +110,39 @@ TOOL_SCHEMAS = [
     {
         'type': 'function',
         'function': {
+            'name': 'update_pet_event',
+            'description': '更新已有事件——主人对一条**已存事件**追加观察/细节时用，避免新建重复条目。'
+                           '典型场景：先文字说"猫吐了"已 save_pet_event(symptom)，本轮发呕吐物图来佐证 → '
+                           '调 update_pet_event 把呕吐物细节追加到原事件，**不要再 save 一条 symptom**。'
+                           '从 system context「最近事件」挑 id=N 的事件传入。',
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'event_id': {
+                        'type': 'integer',
+                        'description': '要更新的事件 ID，从「最近事件」的 id=N 字段获取',
+                    },
+                    'append_note': {
+                        'type': 'string',
+                        'description': '追加到原 note，用「; 」分隔。如「呕吐物含食物残渣和液体」',
+                    },
+                    'payload_patch': {
+                        'type': 'object',
+                        'description': '字段合并到原 payload，同 key 覆盖。如 {"vomit_details": "含食物残渣"}',
+                    },
+                },
+                'required': ['event_id'],
+            },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
             'name': 'reanalyze_image',
             'description': '重新分析当前会话已有的图片。两种合理使用场景：'
                            '(A) **换 task 重看**：主人说"看看情绪/做 BCS/疼痛评估"等切换分析维度 → 调 reanalyze(task=新task)，**可不填 focus**；'
                            '(B) **同 task 看细节**：主人说"再看一下耳朵/瞳孔"等具体部位 → 调 reanalyze(task=原task, focus="耳朵")。'
-                           '**前提**：本会话必须已有图片（system context 有"图片 VLM 分析结果"或"历史 VLM 分析"块）。'
+                           '**前提**：本会话必须已有图片（system context 有"你看到的图片"或"你之前看到的图片"块）。'
                            '**避免**：同 task + 空 focus（已有分析，重复调没意义，工程层会拒绝）。',
             'parameters': {
                 'type': 'object',
@@ -340,22 +368,84 @@ def _save_pet_event(args: dict, ctx: dict) -> dict:
     }
 
 
+def _update_pet_event(args: dict, ctx: dict) -> dict:
+    """更新已有事件：payload 字段合并 + note 追加。happened_at 不动。"""
+    session: Session = ctx['session']
+    event_id = args.get('event_id')
+    if event_id is None:
+        return {'ok': False, 'error': 'missing event_id'}
+
+    event = session.get(PetEvent, event_id)
+    if not event:
+        return {'ok': False, 'error': f'event {event_id} not found'}
+
+    # 防 LLM 编 id：event 必须属于当前 pet
+    ctx_pet_id = ctx.get('pet_id')
+    if ctx_pet_id is not None and event.pet_id != ctx_pet_id:
+        return {'ok': False, 'error': f'event {event_id} belongs to a different pet'}
+
+    # 防误用：不允许更新 24 小时前的旧事件（避免把今日观察追加到几天前的旧事件上）
+    if event.happened_at < datetime.now() - timedelta(hours=24):
+        return {
+            'ok': False,
+            'error': f'event {event_id} 是 {event.happened_at:%Y-%m-%d %H:%M} 的旧事件，'
+                     f'超过 24 小时不允许 update。请用 save_pet_event 新建。',
+        }
+
+    try:
+        old_payload = json.loads(event.payload_json) if event.payload_json else {}
+    except json.JSONDecodeError:
+        old_payload = {}
+
+    payload_patch = args.get('payload_patch')
+    if isinstance(payload_patch, dict) and payload_patch:
+        merged = {**old_payload, **payload_patch}
+        event.payload_json = json.dumps(merged, ensure_ascii=False)
+        old_payload = merged
+
+    append_note = args.get('append_note')
+    if isinstance(append_note, str) and append_note.strip():
+        addition = append_note.strip()
+        event.note = f'{event.note}; {addition}' if event.note else addition
+
+    session.add(event)
+    session.commit()
+    session.refresh(event)
+
+    return {
+        'ok': True,
+        'event_id': event.id,
+        'event_type': event.event_type,
+        'merged_payload': old_payload,
+        'note': event.note,
+    }
+
+
 def _reanalyze_image(args: dict, ctx: dict) -> dict:
     image_path = ctx.get('image_path')
     if not image_path:
         return {'ok': False, 'error': 'no image in current session'}
 
-    # P6.3 智能兜底：同 task 重复调 + 空 focus → 拒绝（避免 LLM 滥用 reanalyze 当 motivation 占位）
-    # 换 task 重看是合理的（如 bcs → emotion），允许空 focus
+    # 工程兜底：同 task 重复调 + 空 focus → 返回已有 VLM 分析（让 LLM 满意，前端隐藏卡片）
+    # 不再拒绝——LLM 想"再看一眼"是合理本能，工程层 fulfill 它，避免挫败感
+    # 换 task 重看 / 同 task+focus → 真跑新 VLM
     focus = (args.get('focus') or '').strip()
     last_vlm_task = ctx.get('last_vlm_task')
     if last_vlm_task and args.get('task') == last_vlm_task and not focus:
+        cached_vlm = ctx.get('current_vlm_output') or ctx.get('historical_vlm_output')
+        if cached_vlm and not (isinstance(cached_vlm, dict) and cached_vlm.get('_error')):
+            return {
+                'ok': True,
+                'task': args['task'],
+                'analysis': cached_vlm,
+                'cached': True,  # 前端检测此标志隐藏卡片（VLM 卡片已展示了同样的内容）
+                '_note': f'同 task "{last_vlm_task}" 已有 VLM 分析，返回原结果',
+            }
+        # cached 拿不到（极少触发）→ 降级温和拒绝
         return {
             'ok': False,
             'skipped': True,
-            'reason': f'同 task "{last_vlm_task}" 已有 VLM 分析，无 focus 不需重看。'
-                      f'若要重看细节请加 focus 参数（如"耳朵朝向"）；'
-                      f'若只是回答主人问题，直接基于上方"图片 VLM 分析结果"或"历史 VLM 分析"块回答即可。',
+            'reason': f'同 task "{last_vlm_task}" 已有 VLM 分析结果，直接基于上方 VLM 块写 final 即可。',
         }
 
     # 延迟 import 避免循环
@@ -548,6 +638,7 @@ TOOL_DISPATCH = {
     'retrieve_vet_knowledge': _retrieve_vet_knowledge,
     'query_pet_history': _query_pet_history,
     'save_pet_event': _save_pet_event,
+    'update_pet_event': _update_pet_event,
     'reanalyze_image': _reanalyze_image,
     'find_nearby_clinic': _find_nearby_clinic,
     'schedule_reminder': _schedule_reminder,  # P6.2

@@ -12,8 +12,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
+from app.auth.deps import ensure_pet_owned_by, get_current_user
 from app.db.database import get_session
-from app.db.models import ChatSession, Pet, PetEvent
+from app.db.models import ChatSession, Pet, PetEvent, User
 
 router = APIRouter(prefix='/api/events', tags=['events'])
 
@@ -57,12 +58,6 @@ def _to_out(e: PetEvent) -> EventOut:
     )
 
 
-def _ensure_pet_exists(pet_id: int, session: Session) -> None:
-    pet = session.get(Pet, pet_id)
-    if not pet or pet.deleted_at:
-        raise HTTPException(404, f'pet {pet_id} not found')
-
-
 # === Endpoints ===
 
 @router.get('', response_model=list[EventOut])
@@ -72,8 +67,9 @@ async def list_events(
     days_back: Optional[int] = Query(None, ge=1, le=3650, description='只返回最近 N 天的事件；不传则不限'),
     limit: int = Query(200, ge=1, le=1000),
     session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
 ):
-    _ensure_pet_exists(pet_id, session)
+    ensure_pet_owned_by(pet_id, user, session)
     stmt = select(PetEvent).where(PetEvent.pet_id == pet_id)
     if event_type:
         stmt = stmt.where(PetEvent.event_type == event_type)
@@ -85,8 +81,12 @@ async def list_events(
 
 
 @router.post('', response_model=EventOut)
-async def create_event(data: EventCreate, session: Session = Depends(get_session)):
-    _ensure_pet_exists(data.pet_id, session)
+async def create_event(
+    data: EventCreate,
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    ensure_pet_owned_by(data.pet_id, user, session)
     e = PetEvent(
         pet_id=data.pet_id,
         event_type=data.event_type,
@@ -102,10 +102,16 @@ async def create_event(data: EventCreate, session: Session = Depends(get_session
 
 
 @router.delete('/{event_id}')
-async def delete_event(event_id: int, session: Session = Depends(get_session)):
+async def delete_event(
+    event_id: int,
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
     e = session.get(PetEvent, event_id)
     if not e:
         raise HTTPException(404, 'event not found')
+    # 检查 event 所属 pet 归当前用户
+    ensure_pet_owned_by(e.pet_id, user, session)
     session.delete(e)
     session.commit()
     return {'ok': True, 'event_id': event_id}
@@ -142,8 +148,9 @@ async def get_timeline(
     metric: str = Query(..., description="bcs / pain_fgs / weight"),
     days_back: Optional[int] = Query(None, ge=1, le=3650),
     session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
 ):
-    _ensure_pet_exists(pet_id, session)
+    ensure_pet_owned_by(pet_id, user, session)
     since = datetime.now() - timedelta(days=days_back) if days_back else None
 
     points: list[TimelinePoint] = []
@@ -220,17 +227,18 @@ async def delete_timeline_point(
     metric: str = Query(..., description='bcs / pain_fgs / weight'),
     id: int = Query(..., description='weight 时是 pet_event.id；bcs/pain_fgs 时是 chat_session.id'),
     session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
 ):
     """删除一个时序图数据点。
 
     - weight: 真删 PetEvent 行（同步从事件时间线消失）
-    - bcs / pain_fgs: 软删——把 chat_sessions.vlm_output_json 置 null，
-      聊天消息本身保留以不破坏历史，仅时序图不再显示
+    - bcs / pain_fgs: 软删——把 chat_sessions.vlm_output_json 置 null
     """
     if metric == 'weight':
         e = session.get(PetEvent, id)
         if not e or e.event_type != 'weight':
             raise HTTPException(404, 'weight event not found')
+        ensure_pet_owned_by(e.pet_id, user, session)
         session.delete(e)
         session.commit()
         return {'ok': True, 'mode': 'hard_delete', 'id': id}
@@ -238,6 +246,10 @@ async def delete_timeline_point(
         row = session.get(ChatSession, id)
         if not row or row.task != metric or row.vlm_output_json is None:
             raise HTTPException(404, 'chat session row with vlm output not found')
+        # chat_session 归属：通过 pet_id 验证
+        if row.pet_id is None:
+            raise HTTPException(404, 'chat session has no pet')
+        ensure_pet_owned_by(row.pet_id, user, session)
         row.vlm_output_json = None
         session.add(row)
         session.commit()

@@ -10,10 +10,14 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
+from sqlmodel import Session
 
 from app.agent.planner import run_agent, run_agent_stream
+from app.auth.deps import ensure_pet_owned_by, get_current_user
+from app.db.database import get_session
+from app.db.models import User
 
 router = APIRouter(prefix='/api/agent', tags=['agent'])
 
@@ -42,12 +46,16 @@ async def chat(
     pet_id: int = Form(...),
     text: str = Form(''),
     image: Optional[UploadFile] = File(None),
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
 ):
     """非流式 - 保留兼容 P4 测试脚本。"""
     text = (text or '').strip()
     has_image = image is not None and image.filename
     if not text and not has_image:
         raise HTTPException(400, 'must provide text or image')
+
+    ensure_pet_owned_by(pet_id, user, session)
 
     image_path = None
     if has_image:
@@ -72,6 +80,8 @@ async def chat_stream(
     session_id: str = Form(...),
     text: str = Form(''),
     image: Optional[UploadFile] = File(None),
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
 ):
     """SSE 流式入口。
 
@@ -80,6 +90,7 @@ async def chat_stream(
       - session_id (str, required) - 客户端生成 UUID，per-pet long-running
       - text (str, optional)
       - image (file, optional)
+      - Authorization: Bearer <jwt> header (required V2)
 
     SSE events 见 planner.run_agent_stream 文档。
     """
@@ -88,10 +99,14 @@ async def chat_stream(
     if not text and not has_image:
         raise HTTPException(400, 'must provide text or image')
 
+    ensure_pet_owned_by(pet_id, user, session)
+
     image_path = None
     image_url = None
     if has_image:
         image_path, image_url = _save_chat_image(image)
+
+    user_id_for_persist = user.id
 
     async def event_gen():
         try:
@@ -101,6 +116,7 @@ async def chat_stream(
                 session_id=session_id,
                 image_path=str(image_path) if image_path else None,
                 image_url_for_persist=image_url,
+                user_id=user_id_for_persist,
             ):
                 yield f'data: {json.dumps(event, ensure_ascii=False)}\n\n'
         except Exception as e:

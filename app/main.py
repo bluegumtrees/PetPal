@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.api.agent import router as agent_router
+from app.api.auth import router as auth_router
 from app.api.events import router as events_router
 from app.api.pets import router as pets_router
 from app.api.reminders import router as reminders_router
@@ -55,6 +56,7 @@ app.add_middleware(
 # 静态文件（宠物头像等用户上传内容）
 app.mount('/static', StaticFiles(directory=str(UPLOAD_DIR)), name='static')
 
+app.include_router(auth_router)
 app.include_router(vet_router)
 app.include_router(pets_router)
 app.include_router(events_router)

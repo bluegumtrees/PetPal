@@ -12,8 +12,9 @@ from PIL import Image
 from pydantic import BaseModel, Field
 from sqlmodel import Session, select
 
+from app.auth.deps import ensure_pet_owned_by, get_current_user
 from app.db.database import get_session
-from app.db.models import Pet, PetEvent
+from app.db.models import Pet, PetEvent, User
 
 router = APIRouter(prefix='/api/pets', tags=['pets'])
 
@@ -59,8 +60,9 @@ def _validate_gender(gender: Optional[str]) -> None:
 async def list_pets(
     include_deleted: bool = Query(False),
     session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
 ):
-    stmt = select(Pet)
+    stmt = select(Pet).where(Pet.user_id == user.id)
     if not include_deleted:
         stmt = stmt.where(Pet.deleted_at.is_(None))
     stmt = stmt.order_by(Pet.created_at.desc())
@@ -68,10 +70,14 @@ async def list_pets(
 
 
 @router.post('', response_model=Pet)
-async def create_pet(data: PetCreate, session: Session = Depends(get_session)):
+async def create_pet(
+    data: PetCreate,
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
     _validate_species(data.species)
     _validate_gender(data.gender)
-    pet = Pet(**data.model_dump())
+    pet = Pet(**data.model_dump(), user_id=user.id)
     session.add(pet)
     session.commit()
     session.refresh(pet)
@@ -96,11 +102,12 @@ async def create_pet(data: PetCreate, session: Session = Depends(get_session)):
 
 
 @router.get('/{pet_id}', response_model=Pet)
-async def get_pet(pet_id: int, session: Session = Depends(get_session)):
-    pet = session.get(Pet, pet_id)
-    if not pet or pet.deleted_at:
-        raise HTTPException(404, 'pet not found')
-    return pet
+async def get_pet(
+    pet_id: int,
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    return ensure_pet_owned_by(pet_id, user, session)
 
 
 @router.patch('/{pet_id}', response_model=Pet)
@@ -108,10 +115,9 @@ async def update_pet(
     pet_id: int,
     data: PetUpdate,
     session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
 ):
-    pet = session.get(Pet, pet_id)
-    if not pet or pet.deleted_at:
-        raise HTTPException(404, 'pet not found')
+    pet = ensure_pet_owned_by(pet_id, user, session)
     _validate_gender(data.gender)
 
     payload = data.model_dump(exclude_unset=True)
@@ -152,10 +158,12 @@ async def update_pet(
 
 
 @router.delete('/{pet_id}')
-async def soft_delete_pet(pet_id: int, session: Session = Depends(get_session)):
-    pet = session.get(Pet, pet_id)
-    if not pet or pet.deleted_at:
-        raise HTTPException(404, 'pet not found')
+async def soft_delete_pet(
+    pet_id: int,
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    pet = ensure_pet_owned_by(pet_id, user, session)
     pet.deleted_at = datetime.now()
     pet.updated_at = pet.deleted_at
     session.add(pet)
@@ -164,10 +172,14 @@ async def soft_delete_pet(pet_id: int, session: Session = Depends(get_session)):
 
 
 @router.post('/{pet_id}/restore', response_model=Pet)
-async def restore_pet(pet_id: int, session: Session = Depends(get_session)):
+async def restore_pet(
+    pet_id: int,
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
     """撤销软删除——MVP 阶段没 UI，但接口留着以防误删。"""
     pet = session.get(Pet, pet_id)
-    if not pet:
+    if not pet or pet.user_id != user.id:
         raise HTTPException(404, 'pet not found')
     if not pet.deleted_at:
         raise HTTPException(400, 'pet is not deleted')
@@ -184,10 +196,9 @@ async def upload_avatar(
     pet_id: int,
     file: UploadFile = File(...),
     session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
 ):
-    pet = session.get(Pet, pet_id)
-    if not pet or pet.deleted_at:
-        raise HTTPException(404, 'pet not found')
+    pet = ensure_pet_owned_by(pet_id, user, session)
 
     if not file.content_type or not file.content_type.startswith('image/'):
         raise HTTPException(400, 'file must be an image')

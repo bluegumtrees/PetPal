@@ -68,51 +68,117 @@ task = {task}
 # 工作基调
 
 1. **多查 RAG**——症状、行为、饮食建议等等，**哪怕你觉得已经知道答案**，先 `retrieve_vet_knowledge` 一次。基于 KB 比凭印象更可靠，主人也能看到你查了什么。
-2. **多记事件**——symptom一定要记，此外有价值的健康信息、体重、有趣观察 都可以 `save_pet_event`。主人翻时间线看记录，少了就没了。
-3. **写 motivation** —— 每次 tool_calls 前务必先写一句简短motivation（≤30 字）告诉主人你要干什么（"先查一下..."、"让我记下来..."等等），开头一定要写。**绝不**写分析建议——那是 final 的事，写在这里 final 就空了。
-4. **final 是最后** —— 所有 tool 都调完后才输出 final。**绝不**在 final 里说"我会记录 / 我会保存"——要么这一轮就再调一次 save_pet_event 真做，要么不写这句话。说了不做最让主人困惑。
 
-# 工作流
+2. **多记事件**——symptom一定要记，有价值的健康信息（bcs/疼痛/情绪/体重评估）一定要记、以及有趣事件和发现都可以 `save_pet_event`。主人翻时间线看记录，少了就没了。
+   **一个例外**：主人对你**刚 save 过的事件**追加细节时（如刚 save "呕吐"，本轮发呕吐物图佐证），改用 `update_pet_event(event_id=N)` 追加而不是新建——避免时间线重复条目。
+   怎么知道刚 save 过？看对话上文 `[已调 tools: ...]` 摘要里的 `event_id=N`，或 system context「最近事件」里 `id=N` 的同类条目（仅限**今日**同 event_type）。
+
+3. ** 多写motivation **：
+   - motivation 是**短动作描述**（≤30 字），告诉主人"我下一步做什么"
+   - **每次 tool_calls 前都要写一句**——尤其是**开头一定要写**（除非不需要调tool），让主人感知你在动手
+   - **不写**分析、建议、结论——那是 final 的事，写在 motivation 里 final 就空了
+   - 不调 tool 时直接 final（详细分析全留 final）
+
+4. **final 是最后**——所有 tool 调完才输出 final。**绝不**在 final 里说"我会记录 / 我会保存"——要么这一轮就调 save_pet_event 真做，要么不写这句话。final 要包含所有相关信息（分析、建议、KB 引用、就医阈值），不是只说"已记录"。
+
+# 工作流（按你的处理顺序：看图 → 查 → 记 → 其他 → final）
 
 **先调工具，后写 final**——final 是整理完信息后给主人的成品，不要在 final 里说"我现在去 X"。
+**每次 tool_calls 务必写一句 motivation**——这是 agent 体验的灵魂。
 
-## 1. 思考过程（每次调 tool 都说一句话）
+## 1. 看图（reanalyze_image）
 
-每次 tool_calls 务必写一句 motivation——这是 agent 体验的灵魂。
+**你的视觉能力（先理解）**：
 
-例子：
-- "我先查一下兽医知识库 📚"
-- "找到几条相关条目，让我先记下来"
-- "BCS 是 8，让我查查饮食方案"
-- "嗯，让我看看附近的医院"
+你是一个多模态 agent，但你不是直接"看"像素——你的视觉感知由 VLM 子系统替你完成。
+每次主人发图，VLM **已经替你看过了**，结果写在「你看到的图片」块里（本轮新图跟在 user message 末尾；本轮无图但 session 有过图时，「你之前看到的图片」块在 system context）：
+- `observation`：你看到的物体 / 部位 / 状态描述
+- `visible_details`：罗列图中所有临床相关细节
+- `candidates` / 分数字段：你的判断结果（如 BCS=8 / FGS=0 / main_emotion=放松）
+- `rationale`：你的判断依据
 
-前端会按长度自动分类（短句直接显示一行，长一点折叠成「中间分析」卡），你写多少都能合适展示。
+**这就是你能从图里得到的全部信息**——基于这些字段组合 RAG 和宠物档案，足够写完整 final。
 
-**不要做的**：把整段最终答复偷渡到 thinking 里。详细分析要留 final。（比如查完知识库后的分析一定要写在最后final里，不要写在中间）
+**图片场景判定**：
 
-## 2. 关键事件入库
+**A) user message 末尾出现「你看到的图片」块** = 本轮主人刚发了新图。
+
+本轮 VLM 输出的 observation 和 visible_details 就是图的全部——直接基于它们写 final 即可，不必再调 reanalyze 看一遍同 task。
+
+判断「承接前轮 vs 全新」——看 system context「最近事件」里是否有**今日同 event_type** 的记录：
+
+- **承接前轮**（最近事件里有**今日同 event_type** 记录，如刚才存过 symptom 本轮发图佐证）：
+  - **优先调 `update_pet_event(event_id=最近的)`** 追加补充观察（如细节、新发现），**不要 save_pet_event 新建**——否则时间线重复
+  - **类型必须匹配**：情绪评估只能 update 到 emotion 事件，BCS 只能 update 到 bcs，不要 update 到不同类型（如 milestone / note）的事件上
+  - 基于 VLM 写 final
+
+- **全新场景**（最近事件无相关）：
+  - 基于 VLM 写 final
+  - symptom（任意）/ bcs ≥7 或 ≤3 / pain_fgs ≥0.39 → **补查 retrieve_vet_knowledge** 拿专业方案
+  - 必要时 save_pet_event 新建
+
+**B) system context 出现「你之前看到的图片」块** = 本轮无新图，但 session 之前有图：
+- 这是**之前**的图，本轮**可以换 task 重看**！
+- 主人问图能回答的**另一维度**（例：上次 emotion，本轮问「疼吗 / 多胖 / 几分」）→ **调 `reanalyze_image(task=新task)`** 重看历史图，**focus 可不填**
+- 主人问图的**同维度更细节**（"再看耳朵"）→ reanalyze(task=同, focus=部位)
+- 主人问的与图无关（如纯文字咨询行为问题）→ 走标准流程（RAG / save / final）
+
+**C) 两个 VLM 块都没有** = 全程无图 → 走标准流程
+
+## 2. 查知识（retrieve_vet_knowledge）
+
+**该查的场景**：
+- **症状类（symptom）**：**务必先查**——基于知识库的回答比凭印象更可靠，**每次新症状都查一次**
+- **bcs 极端值（≥7 或 ≤3）**：拿专业饮食/护理方案
+- **pain_fgs ≥0.39**：拿处置方案
+- 主人问行为问题、饮食建议、罕见健康问题、品种特性等
+
+## 3. 记事件（save_pet_event / update_pet_event）
 
 在 final 之前，**对值得记录的发现宽松调 save_pet_event**：
 - **症状（symptom）一定要存**——主人需要追踪健康历史
 - **体重（weight）一定要存**——主人说"称了 X kg / 现在多重了"等，写 event_type='weight'，会同步档案
-- BCS / 疼痛 / 情绪评估：存
+- **bcs / pain_fgs疼痛评估 / emotion 情绪评估**：一定要存
 - **有趣观察**（"今天第一次主动凑过来"、"换了新粮吃得很香"、"学会了新指令"）：存
-- **不必存**：明显噪声——FGS=0 无痛、纯感叹（"好可爱"）、闲聊问候
+- 默认"值得记录"，少了就没了
 
-判断标准为：主人将来翻时间线时，这条值得看到吗？。默认“值得”。
+**不要在 final 里说"我记一下"**——先完成事件记录再给 final 输出。
 
-payload 怎么填：
+**何时新建（save_pet_event）**：完全新的事件、新症状、新观察、第一次评估。
+
+**何时追加（update_pet_event）**：主人对**你刚记过的事件**追加细节。判断信号：
+- 看对话上文你上一轮 tool 结果有 `event_id=N` → 那就是要 update 的对象
+- 或看 system context「最近事件」里 `id=N` 的**今日同类型**条目
+
+**update 限制**：
+- 只能 update 24 小时内的事件（更早的工程层会拒）
+- 类型必须匹配（情绪 update 到 emotion，BCS update 到 bcs；**不要** update 到 milestone/note 等不相关类型）
+
+**payload 怎么填**：
 - symptom: symptom_desc + severity
 - bcs: bcs_score + rationale
 - pain_fgs: total_score + normalized
 - emotion: main_emotion + confidence
 - weight: weight_kg=数字（单位 kg；**放在 payload 字段里，不要塞 note**。其他单位先换算成 kg：1 斤=0.5 kg）
+- vaccine: vaccine_name + brand?（如 `{"vaccine_name": "猫三联", "brand": "硕腾"}`）
+- feeding: description（如 `{"description": "换三文鱼粮，吃得很香"}`）
+- grooming: description（如 `{"description": "在家洗澡，吹干 30 分钟"}`）
 - milestone: title + description（如 `{"title": "学会握手", "description": "主人教了 3 天"}`）
 - note: text（如 `{"text": "换了三文鱼粮吃得很香"}`）
 
 合并到一个 payload，**不要拆多次调**。
 
-## 3. final（无 tool_calls，给主人的成品）
+## 4. 其他工具
+
+- **chat 有图**：基于上方 VLM 的 observation 字段自然温和回应（不医学化）
+- **find_nearby_clinic**：仅当用户明确给具体地址（"北京海淀"/"上海徐汇"）才调。不要用"附近"占位符
+- **schedule_reminder**：主人说"提醒我下周二给 X 打疫苗 / 30 天后驱虫 / 下个月给小肥洗澡" → 调 schedule_reminder
+  - `scheduled_at_local` 用本地时间 ISO（"2026-05-21T09:00:00"），**不要带 Z 或时区后缀**
+  - `reminder_type` 严格用 enum：vaccine/deworm/bath/medication/checkup/other
+  - 时间没说具体钟点 → 默认上午 9:00；说"下周二/30 天后/下个月"等相对时间，参考 system context 里的"今天日期"算出绝对时间
+  - 重复频率（"每月驱虫一次"）→ 设 `repeat_rule='monthly'` / `yearly` / `every:90d`（MVP 不真重复，但到期会弹"再加一条"按钮）
+
+## 5. final 写法（无 tool_calls，给主人的成品）
 
 **详细 + 灵活 + 有温度**——基于 RAG 返回 / VLM 输出 / 宠物档案自然组织。像朋友说话，不是写学术论文。
 
@@ -124,32 +190,29 @@ payload 怎么填：
 - chat: 基于图片描述自然温和回应，**不医学化**
 
 用 markdown 让答复清晰（**粗体**、- 列表、必要时小标题），但**别死板套模板**——根据具体情境取舍。
-(注意：如果前面调用了工具、记录了事件。final输出应包含所有相关信息，而不仅仅说记录了事件。)
-(注意：事件记录等所有工具都要在输出final前调用完毕，final后回复就结束了，确保用完该用的工具再写final)
 
-## 4. 工具使用
+## 6. motivation 提醒（最后再强调一次）
 
-- **症状类（symptom）**：**务必先 retrieve_vet_knowledge**——基于知识库的回答比凭印象更可靠。**每次新症状都查一次**。然后 save_pet_event → final
-- **bcs / pain_fgs / emotion 有图**（上方有 VLM 分析块）：基于 VLM 输出 → 必要时 save_pet_event → final
-  - **bcs 极端值（≥7 或 ≤3）**：**也要查 retrieve_vet_knowledge** 拿专业饮食/护理方案——比凭印象更可靠
-- **chat 有图**：基于上方 VLM 的 observation 字段自然温和回应（不医学化）
-- **reanalyze_image**：两种合理场景——
-  - **换 task 重看**（"看看情绪"、"做下 BCS"、"评估疼痛"）→ `reanalyze(task=新task)`，**focus 可不填**
-  - **同 task 看细节**（"再仔细看耳朵"、"看下瞳孔"）→ `reanalyze(task=原task, focus="耳朵")`
-  - **不要做的**：同 task + 空 focus（已有分析重复看没意义，工程层会拒）；主人没要求重看也别调（基于已有"图片 VLM 分析结果"或"历史 VLM 分析"块回答即可）
-- **find_nearby_clinic**：仅当用户明确给具体地址（"北京海淀"/"上海徐汇"）才调。不要用"附近"占位符
-- **schedule_reminder**：主人说"提醒我下周二给 X 打疫苗 / 30 天后驱虫 / 下个月给小肥洗澡" → 调 schedule_reminder
-  - `scheduled_at_local` 用本地时间 ISO（"2026-05-20T09:00:00"），**不要带 Z 或时区后缀**
-  - `reminder_type` 严格用 enum：vaccine/deworm/bath/medication/checkup/other
-  - 时间没说具体钟点 → 默认上午 9:00；说"下周二/30 天后/下个月"等相对时间，参考 system context 里的"今天日期"算出绝对时间
-  - 重复频率（"每月驱虫一次"）→ 设 `repeat_rule='monthly'` / `yearly` / `every:90d`（MVP 不真重复，但到期会弹"再加一条"按钮）
+⚠️ **每次 tool_calls 前都要写一句简短 motivation**——这是 agent 体验的灵魂，特别是**第一次 tool 前必写**。
+
+✅ **好的 motivation**（短动作描述，告诉主人"我要做什么"）：
+- "我先查一下兽医知识库 📚"
+- "找到几条相关条目，让我先记下来"
+- "BCS 是 8，让我查查饮食方案"
+- "嗯，让我看看附近的医院"
+- "把这次的呕吐记下来"
+
+❌ **坏的 motivation**（坚决不要做这两种）：
+- ❌ **把分析、建议、结论写在 motivation 里** —— 那是 final 的事，写在这里 final 就空了
+- ❌ **tool_calls 单独跳出来没 content** —— 让主人觉得你在沉默运行
+
+motivation **不回答主人**——回答留给 final。
 
 # 不要做的
 
 - **通常不要调 query_pet_history**——最近 5 条事件已在 system context 给你，除非用户明确问更早历史
 - **不要重复**用相同参数调同一 tool
-- pet_id 用上方"宠物档案"里给的真实 ID，不要编造
-- 不要让 tool_calls 单独跳出来没 content（思考过程是体验的灵魂）"""
+- pet_id 用上方"宠物档案"里给的真实 ID，不要编造"""
 
 
 def _vlm_task_for(task: Task) -> str:
@@ -198,17 +261,20 @@ def run_agent(
                     print(f'[planner] vlm error: {e}')
 
         # ---- Step 3: 构造 messages ----
+        # VLM 块从 system 挪到 user message：让 LLM 真正觉得"主人这一轮发了图"
         pet_ctx = build_pet_context(pet_id, session)
-        vlm_block = format_vlm_block(vlm_output, _vlm_task_for(task)) if vlm_output else ''
+        vlm_block_for_user = format_vlm_block(vlm_output, _vlm_task_for(task)) if vlm_output else ''
         # 用 replace 而不是 .format()：prompt 里可能有字典字面量 {key: val} 会被误解析
         system_prompt = (
             SYSTEM_PROMPT_TEMPLATE
             .replace('{task}', task)
             .replace('{pet_context}', pet_ctx)
-            .replace('{vlm_block}', vlm_block)
+            .replace('{vlm_block}', '')  # sync 版无历史 VLM 概念，本轮 VLM 放到 user 消息
         )
 
         user_content = user_text.strip() if user_text else '（用户未输入文字，仅上传了图片）'
+        if vlm_block_for_user:
+            user_content = f'{user_content}\n\n---\n{vlm_block_for_user}'
 
         messages = [
             {'role': 'system', 'content': system_prompt},
@@ -303,8 +369,10 @@ def run_agent(
                                 'pet_id': pet_id,
                                 'image_path': image_path_str,
                                 'vlm_task': task,
-                                # last_vlm_task: 用于 reanalyze_image 判断"同 task + 空 focus → 拒绝"
+                                # last_vlm_task: 用于 reanalyze_image 判断"同 task + 空 focus → 返回 cached"
                                 'last_vlm_task': _vlm_task_for(task) if vlm_output else None,
+                                # 本轮 VLM 输出，给 reanalyze cached 兜底用
+                                'current_vlm_output': vlm_output,
                                 'session': session,
                             },
                         )
@@ -391,6 +459,42 @@ def _looks_like_transition_only(text: str) -> bool:
     return not has_specifics
 
 
+def _summarize_tool_call_for_history(call: dict) -> str:
+    """把单条 tool 调用记录浓缩成一行（注入 history 让 LLM 跨 run 看到自己调过啥）。
+
+    抽取关键字段：RAG 抽 query；save/update 抽 event_id + event_type；其他抽简略。
+    """
+    tool = call.get('tool', '?')
+    args = call.get('args') or {}
+    result = call.get('result') if isinstance(call.get('result'), dict) else {}
+
+    if tool == 'retrieve_vet_knowledge':
+        q = (args.get('query') or '')[:50]
+        return f"retrieve_vet_knowledge(query='{q}')"
+    if tool == 'save_pet_event':
+        et = args.get('event_type', '')
+        eid = result.get('event_id')
+        return f"save_pet_event({et}, event_id={eid})"
+    if tool == 'update_pet_event':
+        eid = args.get('event_id')
+        et = result.get('event_type', '')
+        return f"update_pet_event(event_id={eid}, type={et})"
+    if tool == 'reanalyze_image':
+        t = args.get('task', '')
+        f = args.get('focus') or ''
+        return f"reanalyze_image(task={t}, focus={f!r})" if f else f"reanalyze_image(task={t})"
+    if tool == 'find_nearby_clinic':
+        loc = (args.get('location') or '')[:30]
+        return f"find_nearby_clinic(location='{loc}')"
+    if tool == 'schedule_reminder':
+        rt = args.get('reminder_type', '')
+        at = args.get('scheduled_at_local', '')
+        return f"schedule_reminder({rt}, at={at})"
+    if tool == 'query_pet_history':
+        return f"query_pet_history({args.get('event_type', 'all')})"
+    return f"{tool}(...)"
+
+
 # ============ Async generator for SSE streaming ============
 
 def _load_history(
@@ -398,9 +502,11 @@ def _load_history(
     session_id: Optional[str],
     limit: int = 8,
 ) -> list[dict]:
-    """从 chat_sessions 加载该 session_id 的最近 limit 条 user/assistant 消息（不含 tool）。
+    """从 chat_sessions 加载该 session_id 的最近 limit 条 user/assistant 消息。
 
     返回 [{role, content}] 列表，按时间顺序（旧→新）。
+    抽取所有 assistant 的 tool_calls 摘要为**独立 system message**（放 history 最前）——
+    让 LLM 看到工具历史但不会把 `[已调 tools]` 当成 assistant 输出格式去模仿。
     """
     if not session_id:
         return []
@@ -413,7 +519,33 @@ def _load_history(
     )
     rows = list(session.exec(stmt).all())
     rows.reverse()  # 改成旧→新
-    return [{'role': r.role, 'content': r.content} for r in rows if r.content]
+
+    # 抽取所有 tool 调用摘要 → 独立 system message（不污染 assistant content）
+    all_summaries: list[str] = []
+    for r in rows:
+        if r.role == 'assistant' and r.tool_calls_json:
+            try:
+                calls = json.loads(r.tool_calls_json)
+                if isinstance(calls, list):
+                    all_summaries.extend(_summarize_tool_call_for_history(c) for c in calls)
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+    out: list[dict] = []
+    if all_summaries:
+        out.append({
+            'role': 'system',
+            'content': (
+                '[已调 tools] 你在当前对话已经调过的 tools（参考用，避免重复 RAG / 重复 save、'
+                '为 update_pet_event 选对 event_id）：\n'
+                + '\n'.join(f'- {s}' for s in all_summaries)
+            ),
+        })
+
+    for r in rows:
+        if r.content:
+            out.append({'role': r.role, 'content': r.content})
+    return out
 
 
 def _persist_message(
@@ -427,10 +559,12 @@ def _persist_message(
     task: Optional[str] = None,
     is_intermediate: bool = False,
     vlm_output_json: Optional[str] = None,
+    user_id: Optional[int] = None,
 ) -> None:
     msg = ChatSession(
         session_id=session_id,
         pet_id=pet_id,
+        user_id=user_id,
         role=role,
         content=content,
         tool_calls_json=tool_calls_json,
@@ -450,6 +584,7 @@ async def run_agent_stream(
     image_path: Optional[str | Path] = None,
     image_url_for_persist: Optional[str] = None,
     max_iter: int = 5,
+    user_id: Optional[int] = None,
 ) -> AsyncIterator[dict]:
     """SSE 事件流主实现。yield 事件 dict（外层负责序列化为 SSE）。
 
@@ -565,6 +700,7 @@ async def run_agent_stream(
                 db,
                 session_id=session_id,
                 pet_id=pet_id,
+                user_id=user_id,
                 role='user',
                 content=user_text or '',
                 image_url=image_url_for_persist,
@@ -573,34 +709,41 @@ async def run_agent_stream(
             )
 
         # --- Step 3: messages ---
+        # VLM 块策略：
+        # - 本轮新图（vlm_output）→ 拼到 user message 末尾（让 LLM 觉得是本轮 user 输入的视觉信息）
+        # - 本轮无图但 session 有历史图（historical_vlm_output）→ 放 system（这是真正的"背景资料"）
         pet_ctx = build_pet_context(pet_id, db)
+        vlm_block_for_user = ''
+        vlm_block_for_system = ''
         if vlm_output:
-            vlm_block = format_vlm_block(vlm_output, _vlm_task_for(task))
+            vlm_block_for_user = format_vlm_block(vlm_output, _vlm_task_for(task))
         elif historical_vlm_output:
-            vlm_block = format_vlm_block(
+            vlm_block_for_system = format_vlm_block(
                 historical_vlm_output,
                 historical_vlm_task or 'unknown',
-                label=f'历史 VLM 分析（参考用，{historical_vlm_at}，本轮主人未上传新图）',
+                label=f'你之前看到的图片（参考用，{historical_vlm_at}，本轮主人未上传新图）',
             )
-        else:
-            vlm_block = ''
-        # 历史图提示：本轮无图但 session 有过图时，告诉 LLM 可以 reanalyze（with focus）
-        if historical_image_path and not has_image:
-            vlm_block += (
-                '\n\n## 历史图片可用\n'
-                '本会话之前用户上传过图片，仍可重新分析。'
-                '**只有当主人明确说"再看一下 X"** 时才调 `reanalyze_image(task=..., focus="具体细节如耳朵/瞳孔")`。'
-                '通常基于上方历史 VLM 分析回答即可，不要无谓地 reanalyze。'
-            )
+        # 历史图提示规则已统一到 SYSTEM_PROMPT_TEMPLATE 「图片场景判定」B 分支，
+        # 不再在此追加额外块（避免与 prompt 中规则重复或冲突）。
         # 用 replace 而不是 .format()：prompt 里可能有字典字面量 {key: val} 会被 format 误解析为 placeholder
         system_prompt = (
             SYSTEM_PROMPT_TEMPLATE
             .replace('{task}', task)
             .replace('{pet_context}', pet_ctx)
-            .replace('{vlm_block}', vlm_block)
+            .replace('{vlm_block}', vlm_block_for_system)
         )
 
         history = _load_history(db, session_id, limit=8)
+        # 本轮新图 → 把 VLM 块拼到 history 最后一条 user message（让 LLM 知道"主人这一轮发了图"）
+        if vlm_block_for_user:
+            for i in range(len(history) - 1, -1, -1):
+                if history[i].get('role') == 'user':
+                    original_content = history[i].get('content', '')
+                    history[i] = {
+                        'role': 'user',
+                        'content': f'{original_content}\n\n---\n{vlm_block_for_user}',
+                    }
+                    break
         # 移除最新刚插入的本次 user message（避免重复出现）
         # 实际上 _load_history 已经把它包含进去了，但消息没新插入到 db 时 history 也不会有
         # 我们这里 history 已经包含本次 user msg，让 LLM 看到上下文是对的
@@ -669,6 +812,7 @@ async def run_agent_stream(
                         db,
                         session_id=session_id,
                         pet_id=pet_id,
+                        user_id=user_id,
                         role='assistant',
                         content=final,
                         task=task,
@@ -688,6 +832,7 @@ async def run_agent_stream(
                     db,
                     session_id=session_id,
                     pet_id=pet_id,
+                    user_id=user_id,
                     role='assistant',
                     content=final,
                     task=task,
@@ -770,11 +915,14 @@ async def run_agent_stream(
                                 'pet_id': pet_id,
                                 'image_path': ctx_image,
                                 'vlm_task': task,
-                                # last_vlm_task: 同 task + 空 focus 时 reanalyze 拒绝；换 task 允许
+                                # last_vlm_task: 同 task + 空 focus 时 reanalyze 返回 cached；换 task 允许
                                 'last_vlm_task': (
                                     _vlm_task_for(task) if vlm_output
                                     else historical_vlm_task
                                 ),
+                                # VLM 输出给 reanalyze cached 兜底用（优先本轮，没有用历史）
+                                'current_vlm_output': vlm_output,
+                                'historical_vlm_output': historical_vlm_output,
                                 'session': db,
                             },
                         )
@@ -810,6 +958,7 @@ async def run_agent_stream(
                 db,
                 session_id=session_id,
                 pet_id=pet_id,
+                user_id=user_id,
                 role='assistant',
                 content=msg.content or '',
                 tool_calls_json=json.dumps(tool_calls_for_audit, ensure_ascii=False),

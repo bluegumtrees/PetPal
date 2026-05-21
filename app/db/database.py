@@ -28,6 +28,7 @@ def init_db() -> None:
     SQLModel.metadata.create_all(_engine)
     _migrate_chat_sessions_v2()
     _migrate_reminders_p62()
+    _migrate_users_v2()
 
 
 def _migrate_chat_sessions_v2() -> None:
@@ -87,6 +88,83 @@ def _migrate_reminders_p62() -> None:
         if added:
             conn.commit()
             print(f'[migrate] reminders: added columns {added}')
+    finally:
+        conn.close()
+
+
+def _migrate_users_v2() -> None:
+    """V2: pets / chat_sessions 加 user_id 列 + 自动创建 demo 用户 + 回填历史数据。
+
+    迁移策略：
+    1. ALTER TABLE 加 user_id NULL 列（先允许 NULL 兼容旧数据）
+    2. 创建 demo 用户（如果不存在）
+    3. 把所有 user_id=NULL 的 pets / chat_sessions 回填到 demo
+    """
+    import sqlite3
+    if not DB_PATH.exists():
+        return
+    conn = sqlite3.connect(str(DB_PATH))
+    try:
+        added = []
+        # pets 加 user_id
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(pets)")}
+        if 'user_id' not in cols:
+            conn.execute("ALTER TABLE pets ADD COLUMN user_id INTEGER")
+            conn.execute("CREATE INDEX IF NOT EXISTS ix_pets_user_id ON pets(user_id)")
+            added.append('pets.user_id')
+        # chat_sessions 加 user_id
+        cols2 = {r[1] for r in conn.execute("PRAGMA table_info(chat_sessions)")}
+        if 'user_id' not in cols2:
+            conn.execute("ALTER TABLE chat_sessions ADD COLUMN user_id INTEGER")
+            conn.execute("CREATE INDEX IF NOT EXISTS ix_chat_sessions_user_id ON chat_sessions(user_id)")
+            added.append('chat_sessions.user_id')
+        if added:
+            conn.commit()
+            print(f'[migrate] V2 added columns: {added}')
+
+        # 回填 demo 用户
+        users_table_exists = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='users'"
+        ).fetchone()
+        if not users_table_exists:
+            return  # SQLModel.create_all 应该已经创建过，但兜底跳过
+
+        demo_row = conn.execute(
+            "SELECT id FROM users WHERE email = 'demo@petpal.local' LIMIT 1"
+        ).fetchone()
+        if not demo_row:
+            # 首次启动：创建 demo 用户
+            from app.auth.security import hash_password
+            demo_hash = hash_password('demo123')
+            from datetime import datetime
+            conn.execute(
+                "INSERT INTO users (email, password_hash, name, is_demo, created_at) "
+                "VALUES (?, ?, ?, ?, ?)",
+                ('demo@petpal.local', demo_hash, 'Demo 试用账号', 1, datetime.now().isoformat()),
+            )
+            conn.commit()
+            print('[migrate] V2 created demo user (email=demo@petpal.local)')
+            demo_row = conn.execute(
+                "SELECT id FROM users WHERE email = 'demo@petpal.local' LIMIT 1"
+            ).fetchone()
+
+        demo_id = demo_row[0]
+
+        # 回填 user_id NULL 的 pets → demo
+        result = conn.execute(
+            "UPDATE pets SET user_id = ? WHERE user_id IS NULL",
+            (demo_id,),
+        )
+        if result.rowcount > 0:
+            print(f'[migrate] V2 backfilled {result.rowcount} pets to demo user (id={demo_id})')
+        # 回填 user_id NULL 的 chat_sessions → demo
+        result2 = conn.execute(
+            "UPDATE chat_sessions SET user_id = ? WHERE user_id IS NULL",
+            (demo_id,),
+        )
+        if result2.rowcount > 0:
+            print(f'[migrate] V2 backfilled {result2.rowcount} chat_sessions to demo user')
+        conn.commit()
     finally:
         conn.close()
 
