@@ -26,7 +26,7 @@ export default function SessionList({ petId, currentSessionId, onSelect, onClose
   const [deletingId, setDeletingId] = useState(null)
 
   async function handleDelete(sid, e) {
-    e.stopPropagation()  // 不触发外层 button 切换
+    e.stopPropagation()
     if (!window.confirm('删除这条对话？无法撤销。')) return
     setDeletingId(sid)
     try {
@@ -51,7 +51,6 @@ export default function SessionList({ petId, currentSessionId, onSelect, onClose
       .finally(() => setLoading(false))
   }, [petId])
 
-  // 点击外部关闭
   useEffect(() => {
     function onClick(e) {
       if (e.target.closest('[data-session-list]')) return
@@ -65,24 +64,46 @@ export default function SessionList({ petId, currentSessionId, onSelect, onClose
   return (
     <div
       data-session-list
-      className="absolute top-full right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-xl z-40 w-80 max-h-96 overflow-y-auto"
+      className="absolute top-full right-0 mt-2 rounded-xl shadow-xl z-40 w-80 max-h-96 overflow-y-auto border"
+      style={{ background: 'var(--v4-card)', borderColor: 'var(--v4-line)' }}
     >
-      <div className="sticky top-0 bg-white border-b border-slate-100 px-3 py-2 flex items-center justify-between">
-        <span className="text-xs uppercase tracking-wider text-slate-400 font-medium">历史会话</span>
+      <div
+        className="sticky top-0 px-3 py-2 flex items-center justify-between border-b"
+        style={{ background: 'var(--v4-card)', borderColor: 'var(--v4-line)' }}
+      >
+        <span
+          className="text-xs uppercase tracking-wider font-medium"
+          style={{ color: 'var(--v4-faint)' }}
+        >
+          历史会话
+        </span>
         <button
           type="button"
           onClick={onClose}
-          className="text-slate-400 hover:text-slate-600 text-base leading-none"
+          className="text-base leading-none transition"
+          style={{ color: 'var(--v4-faint)' }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--v4-ink)')}
+          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--v4-faint)')}
           aria-label="close"
         >
           ✕
         </button>
       </div>
 
-      {loading && <p className="text-sm text-slate-400 text-center py-6">加载中…</p>}
-      {!loading && error && <p className="text-sm text-red-500 text-center py-4">{error}</p>}
+      {loading && (
+        <p className="text-sm text-center py-6" style={{ color: 'var(--v4-faint)' }}>
+          加载中…
+        </p>
+      )}
+      {!loading && error && (
+        <p className="text-sm text-center py-4" style={{ color: 'var(--v4-warn)' }}>
+          {error}
+        </p>
+      )}
       {!loading && !error && sessions.length === 0 && (
-        <p className="text-sm text-slate-400 text-center py-8">还没有历史对话</p>
+        <p className="text-sm text-center py-8" style={{ color: 'var(--v4-faint)' }}>
+          还没有历史对话
+        </p>
       )}
 
       {!loading && sessions.length > 0 && (
@@ -93,9 +114,17 @@ export default function SessionList({ petId, currentSessionId, onSelect, onClose
             return (
               <li
                 key={s.session_id}
-                className={`group relative border-b border-slate-100 last:border-b-0 hover:bg-slate-50 transition ${
-                  isCurrent ? 'bg-amber-50' : ''
-                }`}
+                className="group relative border-b last:border-b-0 transition"
+                style={{
+                  borderColor: 'var(--v4-line)',
+                  background: isCurrent ? 'var(--v4-accent-soft)' : 'transparent',
+                }}
+                onMouseEnter={(e) => {
+                  if (!isCurrent) e.currentTarget.style.background = 'var(--v4-tint)'
+                }}
+                onMouseLeave={(e) => {
+                  if (!isCurrent) e.currentTarget.style.background = 'transparent'
+                }}
               >
                 <button
                   type="button"
@@ -107,24 +136,41 @@ export default function SessionList({ petId, currentSessionId, onSelect, onClose
                   className="w-full text-left px-3 py-2.5 pr-9 disabled:opacity-40"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <p className="text-sm text-slate-700 line-clamp-1 flex-1">
-                      {s.last_user_text || <span className="text-slate-400 italic">空对话</span>}
+                    <p
+                      className="text-sm line-clamp-1 flex-1"
+                      style={{ color: 'var(--v4-ink)' }}
+                    >
+                      {s.last_user_text || (
+                        <span className="italic" style={{ color: 'var(--v4-faint)' }}>
+                          空对话
+                        </span>
+                      )}
                     </p>
-                    <span className="text-[10px] text-slate-400 shrink-0 whitespace-nowrap">
+                    <span
+                      className="text-[10px] shrink-0 whitespace-nowrap"
+                      style={{ color: 'var(--v4-faint)' }}
+                    >
                       {fmtRelative(s.last_at)}
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-400 mt-0.5 font-mono">
+                  <p
+                    className="text-[11px] mt-0.5 font-mono"
+                    style={{ color: 'var(--v4-faint)' }}
+                  >
                     {s.message_count} 条 · {s.session_id.slice(0, 8)}
-                    {isCurrent && <span className="ml-1 text-amber-600">· 当前</span>}
+                    {isCurrent && (
+                      <span className="ml-1" style={{ color: 'var(--v4-accent-deep)' }}>
+                        · 当前
+                      </span>
+                    )}
                   </p>
                 </button>
-                {/* 删除按钮：右下角 hover 才显示，避免误触 */}
                 <button
                   type="button"
                   onClick={(e) => handleDelete(s.session_id, e)}
                   disabled={isDeleting}
-                  className="absolute right-2 bottom-2 opacity-0 group-hover:opacity-100 transition text-[11px] text-red-500 hover:text-red-700 hover:bg-red-50 rounded px-1.5 py-0.5 disabled:opacity-50"
+                  className="absolute right-2 bottom-2 opacity-0 group-hover:opacity-100 transition text-[11px] rounded px-1.5 py-0.5 disabled:opacity-50"
+                  style={{ color: 'var(--v4-warn)' }}
                   title="删除这条对话"
                 >
                   {isDeleting ? '…' : '🗑'}

@@ -3,9 +3,10 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import Lightbox from './Lightbox'
 import { vlmBadge } from './VLMCard'
+import { CatEarBubble, Illo } from './v4'
 
 /**
- * 用户消息卡片：右对齐，米色，纯文本 + 缩略图。
+ * 用户消息卡片：右对齐，猫耳气泡（V4），纯文本 + 缩略图。
  * @param {{ content: string, imageUrl?: string, vlmTask?: string, vlmOutput?: object }} props
  */
 export function UserMessage({ content, imageUrl, vlmTask, vlmOutput }) {
@@ -13,26 +14,31 @@ export function UserMessage({ content, imageUrl, vlmTask, vlmOutput }) {
   const badge = vlmTask && vlmOutput ? vlmBadge(vlmTask, vlmOutput) : null
 
   return (
-    <div className="flex justify-end mb-3">
-      <div className="max-w-[80%] flex flex-col items-end gap-1">
+    <div className="flex justify-end items-start gap-2 mb-3">
+      <div className="max-w-[80%] flex flex-col items-end gap-1.5">
         {imageUrl && (
           <div className="relative inline-block">
             <img
               src={imageUrl}
               alt=""
               onClick={() => setLightbox(true)}
-              className="w-[150px] h-[150px] object-cover rounded-xl cursor-zoom-in shadow-sm hover:shadow-md transition"
+              className="w-[150px] h-[150px] object-cover rounded-xl cursor-zoom-in shadow-sm hover:shadow-md transition border"
+              style={{ borderColor: 'var(--v4-line)' }}
             />
             {badge && (
               <span
                 className={
-                  'absolute bottom-1.5 left-1.5 right-1.5 text-[11px] font-medium text-center px-1.5 py-0.5 rounded backdrop-blur-sm ' +
-                  (badge.kind === 'alert'
-                    ? 'bg-red-500/85 text-white'
-                    : badge.kind === 'warn'
-                    ? 'bg-orange-500/85 text-white'
-                    : 'bg-black/55 text-white')
+                  'absolute bottom-1.5 left-1.5 right-1.5 text-[11px] font-medium text-center px-1.5 py-0.5 rounded backdrop-blur-sm '
                 }
+                style={{
+                  background:
+                    badge.kind === 'alert'
+                      ? 'color-mix(in oklch, var(--v4-warn) 85%, transparent)'
+                      : badge.kind === 'warn'
+                      ? 'color-mix(in oklch, var(--v4-accent) 85%, transparent)'
+                      : 'rgba(0,0,0,0.55)',
+                  color: 'white',
+                }}
               >
                 {badge.label}
               </span>
@@ -41,30 +47,46 @@ export function UserMessage({ content, imageUrl, vlmTask, vlmOutput }) {
           </div>
         )}
         {content && (
-          <div className="bg-amber-100 text-slate-800 rounded-2xl rounded-tr-md px-4 py-2 text-sm whitespace-pre-wrap">
-            {content}
-          </div>
+          <CatEarBubble from="user" maxWidth={520}>
+            <div className="whitespace-pre-wrap">{content}</div>
+          </CatEarBubble>
         )}
+      </div>
+      {/* user avatar — 小爪子 */}
+      <div
+        className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center mt-1"
+        style={{ background: 'var(--v4-accent-soft)' }}
+      >
+        <Illo name="paw" size={14} color="var(--v4-accent-deep)" />
       </div>
     </div>
   )
 }
 
 /**
- * AI 消息卡片：左对齐，白色，markdown 渲染。
+ * AI 消息卡片：左对齐，V4 卡片 + 猫脸头像，markdown 渲染。
  * @param {{ content: string, pet?: object }} props
  */
-export function AssistantMessage({ content, pet }) {
+export function AssistantMessage({ content }) {
   if (!content) return null
   return (
-    <div className="flex gap-2 mb-3">
-      <div className="shrink-0 mt-0.5">
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-rose-400 flex items-center justify-center text-white text-sm">
-          🐾
-        </div>
+    <div className="flex gap-2 mb-3 items-start">
+      <div
+        className="shrink-0 mt-0.5 w-9 h-9 rounded-full flex items-center justify-center"
+        style={{ background: 'var(--v4-accent-soft)' }}
+      >
+        <Illo name="cat-face" size={28} color="white" secondary="white" />
       </div>
-      <div className="max-w-[80%] bg-white border border-slate-200 rounded-2xl rounded-tl-md px-4 py-2 shadow-sm">
-        <div className="prose prose-sm max-w-none text-slate-800 leading-relaxed">
+      <div
+        className="max-w-[80%] rounded-2xl rounded-tl-md px-4 py-2 border"
+        style={{
+          background: 'var(--v4-card)',
+          borderColor: 'var(--v4-line)',
+          color: 'var(--v4-ink)',
+          boxShadow: 'var(--v4-shadow-sm)',
+        }}
+      >
+        <div className="prose prose-sm max-w-none leading-relaxed">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
         </div>
       </div>
@@ -82,16 +104,19 @@ export function AssistantThinking({ content }) {
   const [open, setOpen] = useState(false)
   if (!text) return null
 
-  // 短内容直接展示，淡灰小字
+  // 短内容直接展示，淡色小字 + 灯泡
   if (isShort) {
     return (
-      <div className="flex gap-2 mb-2">
-        <div className="shrink-0">
-          <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-xs">
-            💭
-          </div>
+      <div className="flex gap-2 mb-2 items-center">
+        <div
+          className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs"
+          style={{ background: 'var(--v4-tint)' }}
+        >
+          <Illo name="sparkle" size={14} color="var(--v4-faint)" />
         </div>
-        <div className="text-xs text-slate-500 italic self-center">{text}</div>
+        <div className="text-xs italic" style={{ color: 'var(--v4-mute)' }}>
+          {text}
+        </div>
       </div>
     )
   }
@@ -99,20 +124,36 @@ export function AssistantThinking({ content }) {
   // 长内容默认折叠
   const preview = text.replace(/\n+/g, ' ').slice(0, 60) + '…'
   return (
-    <div className="my-2 bg-slate-50 border border-slate-200 rounded-xl">
+    <div
+      className="my-2 rounded-xl border"
+      style={{
+        background: 'var(--v4-tint)',
+        borderColor: 'var(--v4-line)',
+        boxShadow: 'var(--v4-shadow-sm)',
+      }}
+    >
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-slate-100 rounded-xl transition"
+        className="w-full flex items-center gap-2 px-3 py-2 text-left rounded-xl transition"
+        style={{ color: 'var(--v4-mute)' }}
+        onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--v4-accent-soft)')}
+        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
       >
-        <span className="text-sm">💭</span>
-        <span className="text-[10px] uppercase tracking-wide text-slate-400">中间分析</span>
-        <span className="flex-1 text-xs text-slate-500 truncate">{preview}</span>
-        <span className="text-xs text-slate-400">{open ? '▲' : '▼'}</span>
+        <Illo name="sparkle" size={14} color="var(--v4-accent)" />
+        <span className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--v4-faint)' }}>
+          中间分析
+        </span>
+        <span className="flex-1 text-xs truncate" style={{ color: 'var(--v4-mute)' }}>
+          {preview}
+        </span>
+        <span className="text-xs" style={{ color: 'var(--v4-faint)' }}>
+          {open ? '▲' : '▼'}
+        </span>
       </button>
       {open && (
         <div className="px-4 pb-3">
-          <div className="prose prose-sm max-w-none text-slate-600">
+          <div className="prose prose-sm max-w-none" style={{ color: 'var(--v4-mute)' }}>
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
           </div>
         </div>

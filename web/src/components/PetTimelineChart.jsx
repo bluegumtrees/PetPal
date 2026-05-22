@@ -10,11 +10,13 @@ import {
 } from 'recharts'
 import { api } from '../api'
 import Lightbox from './Lightbox'
+import { V4Btn, V4Card, Illo } from './v4'
 
+// Chart 颜色用固定 V4 风格调色（保持稳定，不随主题切换抖动）
 const TABS = [
-  { key: 'bcs', label: 'BCS 体态', unit: '', yDomain: [1, 9], color: '#f59e0b' },
-  { key: 'weight', label: '体重', unit: 'kg', yDomain: ['auto', 'auto'], color: '#10b981' },
-  { key: 'pain_fgs', label: 'FGS 疼痛', unit: '', yDomain: [0, 10], color: '#ef4444' },
+  { key: 'bcs', label: 'BCS 体态', unit: '', yDomain: [1, 9], color: '#e98469' },
+  { key: 'weight', label: '体重', unit: 'kg', yDomain: ['auto', 'auto'], color: '#7cbca5' },
+  { key: 'pain_fgs', label: 'FGS 疼痛', unit: '', yDomain: [0, 10], color: '#d97757' },
 ]
 
 const WINDOWS = [
@@ -28,6 +30,11 @@ const EMPTY_HINT = {
   weight: '还没有体重记录。在上方输入当前体重即可记录第一笔。',
   pain_fgs: '还没有 FGS 疼痛评估。让 PetPal 做 FGS 评估后会自动出现。',
 }
+
+// 网格线和轴用半透明黑——适配深色/浅色主题
+const GRID_STROKE = 'rgba(120, 120, 120, 0.18)'
+const AXIS_STROKE = 'rgba(120, 120, 120, 0.32)'
+const AXIS_TICK_FILL = 'rgba(120, 120, 120, 0.75)'
 
 function formatX(ts) {
   const d = new Date(ts)
@@ -46,23 +53,39 @@ function HoverTooltip({ active, payload, tab }) {
   const previous = p.extra?.previous
 
   return (
-    <div className="bg-white/95 backdrop-blur border border-slate-200 rounded-lg shadow-lg px-3 py-2 text-xs">
-      <div className="text-slate-400">{dateStr}</div>
+    <div
+      className="backdrop-blur rounded-lg shadow-lg px-3 py-2 text-xs border"
+      style={{
+        background: 'color-mix(in oklch, var(--v4-card) 95%, transparent)',
+        borderColor: 'var(--v4-line)',
+      }}
+    >
+      <div style={{ color: 'var(--v4-faint)' }}>{dateStr}</div>
       <div className="flex items-baseline gap-1.5 mt-0.5">
         <span className="text-base font-semibold" style={{ color: tab.color }}>
           {row.y}
         </span>
-        {tab.unit && <span className="text-slate-500">{tab.unit}</span>}
+        {tab.unit && <span style={{ color: 'var(--v4-mute)' }}>{tab.unit}</span>}
         {typeof delta === 'number' && delta !== 0 && (
-          <span className={`text-[11px] font-medium ${delta > 0 ? 'text-orange-600' : 'text-blue-600'}`}>
-            {delta > 0 ? '+' : ''}{delta}{tab.unit}
+          <span
+            className="text-[11px] font-medium"
+            style={{ color: delta > 0 ? 'var(--v4-warn)' : 'var(--v4-second)' }}
+          >
+            {delta > 0 ? '+' : ''}
+            {delta}
+            {tab.unit}
           </span>
         )}
       </div>
       {typeof previous === 'number' && (
-        <div className="text-slate-400 text-[11px] mt-0.5">上次 {previous}{tab.unit}</div>
+        <div className="text-[11px] mt-0.5" style={{ color: 'var(--v4-faint)' }}>
+          上次 {previous}
+          {tab.unit}
+        </div>
       )}
-      <div className="text-[10px] text-slate-300 mt-1">点击数据点查看详情</div>
+      <div className="text-[10px] mt-1" style={{ color: 'var(--v4-faint)' }}>
+        点击数据点查看详情
+      </div>
     </div>
   )
 }
@@ -206,54 +229,78 @@ export default function PetTimelineChart({ petId, currentWeight, refreshKey = 0,
   const latestPoint = chartData.length > 0 ? chartData[chartData.length - 1] : null
 
   return (
-    <section className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+    <V4Card padding="p-6" className="shadow-sm rounded-2xl">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-xs uppercase tracking-wider text-slate-400 font-medium">
+        <h3
+          className="text-xs uppercase tracking-wider font-medium inline-flex items-center gap-2"
+          style={{ color: 'var(--v4-faint)' }}
+        >
+          <Illo name="scale" size={12} color="var(--v4-accent)" />
           时序对比
         </h3>
         <div className="flex gap-1 text-xs">
-          {WINDOWS.map((w) => (
-            <button
-              key={w.key}
-              type="button"
-              onClick={() => setWindowKey(w.key)}
-              className={`px-2.5 py-1 rounded-md transition ${
-                windowKey === w.key
-                  ? 'bg-slate-800 text-white'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              {w.label}
-            </button>
-          ))}
+          {WINDOWS.map((w) => {
+            const active = windowKey === w.key
+            return (
+              <button
+                key={w.key}
+                type="button"
+                onClick={() => setWindowKey(w.key)}
+                className="px-2.5 py-1 rounded-md transition"
+                style={{
+                  background: active ? 'var(--v4-accent)' : 'var(--v4-tint)',
+                  color: active ? 'white' : 'var(--v4-mute)',
+                  fontWeight: active ? 600 : 500,
+                }}
+              >
+                {w.label}
+              </button>
+            )
+          })}
         </div>
       </div>
 
-      <div className="flex gap-1 mb-5 border-b border-slate-200">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            onClick={() => setTabKey(t.key)}
-            className={`px-3 py-2 text-sm transition border-b-2 -mb-px ${
-              tabKey === t.key
-                ? 'border-amber-500 text-slate-800 font-medium'
-                : 'border-transparent text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+      <div className="flex gap-1 mb-5 border-b" style={{ borderColor: 'var(--v4-line)' }}>
+        {TABS.map((t) => {
+          const active = tabKey === t.key
+          return (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => setTabKey(t.key)}
+              className="px-3 py-2 text-sm transition border-b-2 -mb-px"
+              style={{
+                borderColor: active ? 'var(--v4-accent)' : 'transparent',
+                color: active ? 'var(--v4-ink)' : 'var(--v4-mute)',
+                fontWeight: active ? 600 : 500,
+              }}
+            >
+              {t.label}
+            </button>
+          )
+        })}
       </div>
 
       {/* 体重 tab 顶部：inline 称重输入条 */}
       {tabKey === 'weight' && (
-        <div className="mb-5 flex flex-wrap items-center gap-2 rounded-lg bg-emerald-50/60 border border-emerald-100 px-3 py-2.5">
-          <span className="text-xs text-slate-600 whitespace-nowrap">
+        <div
+          className="mb-5 flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2.5"
+          style={{
+            background: 'var(--v4-second-soft)',
+            borderColor: 'color-mix(in oklch, var(--v4-second) 30%, transparent)',
+          }}
+        >
+          <span
+            className="text-xs whitespace-nowrap"
+            style={{ color: 'var(--v4-mute)' }}
+          >
             {currentWeight != null ? (
-              <>当前 <strong className="text-slate-800">{currentWeight} kg</strong></>
+              <>
+                当前{' '}
+                <strong style={{ color: 'var(--v4-ink)' }}>{currentWeight} kg</strong>
+              </>
             ) : (
-              <span className="text-slate-500">尚未记录体重</span>
+              <span style={{ color: 'var(--v4-faint)' }}>尚未记录体重</span>
             )}
           </span>
           <input
@@ -269,33 +316,52 @@ export default function PetTimelineChart({ petId, currentWeight, refreshKey = 0,
               if (e.key === 'Enter' && !weightSubmitting) handleWeightSubmit()
             }}
             disabled={weightSubmitting}
-            className="flex-1 min-w-[100px] max-w-[140px] border border-slate-300 rounded-md px-2.5 py-1 text-sm focus:outline-none focus:border-emerald-400 disabled:opacity-50"
+            className="flex-1 min-w-[100px] max-w-[140px] border rounded-md px-2.5 py-1 text-sm focus:outline-none disabled:opacity-50"
+            style={{
+              background: 'var(--v4-card)',
+              borderColor: 'var(--v4-line)',
+              color: 'var(--v4-ink)',
+            }}
           />
-          <button
-            type="button"
+          <V4Btn
+            variant="primary"
+            size="sm"
             onClick={handleWeightSubmit}
             disabled={weightSubmitting || !weightInput}
-            className="px-3 py-1 rounded-md bg-emerald-500 text-white text-xs hover:bg-emerald-600 transition disabled:opacity-50"
+            icon="sparkle"
           >
-            {weightSubmitting ? '保存中…' : '+ 记录'}
-          </button>
+            {weightSubmitting ? '保存中…' : '记录'}
+          </V4Btn>
           {weightError && (
-            <span className="text-xs text-red-600 basis-full">{weightError}</span>
+            <span
+              className="text-xs basis-full"
+              style={{ color: 'var(--v4-warn)' }}
+            >
+              {weightError}
+            </span>
           )}
         </div>
       )}
 
-      {loading && <p className="text-sm text-slate-400 text-center py-12">加载中…</p>}
+      {loading && (
+        <p className="text-sm text-center py-12" style={{ color: 'var(--v4-faint)' }}>
+          加载中…
+        </p>
+      )}
       {!loading && error && (
-        <p className="text-sm text-red-500 text-center py-12">{error}</p>
+        <p className="text-sm text-center py-12" style={{ color: 'var(--v4-warn)' }}>
+          {error}
+        </p>
       )}
       {!loading && !error && chartData.length === 0 && (
-        <p className="text-sm text-slate-400 text-center py-12">
+        <p className="text-sm text-center py-12" style={{ color: 'var(--v4-faint)' }}>
           {EMPTY_HINT[tab.key]}
           {win.days && (
             <>
               <br />
-              <span className="text-xs text-slate-300">（当前窗口：{win.label}，可切换到「全部」看更多）</span>
+              <span className="text-xs" style={{ color: 'var(--v4-faint)' }}>
+                （当前窗口：{win.label}，可切换到「全部」看更多）
+              </span>
             </>
           )}
         </p>
@@ -304,24 +370,24 @@ export default function PetTimelineChart({ petId, currentWeight, refreshKey = 0,
         <div className="relative w-full" style={{ height: 280 }}>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} vertical={false} />
               <XAxis
                 dataKey="ts"
                 type="number"
                 domain={['dataMin', 'dataMax']}
                 tickFormatter={formatX}
-                stroke="#cbd5e1"
+                stroke={AXIS_STROKE}
                 fontSize={11}
-                tick={{ fill: '#64748b' }}
+                tick={{ fill: AXIS_TICK_FILL }}
                 tickMargin={8}
                 axisLine={false}
                 tickLine={false}
               />
               <YAxis
                 domain={tab.yDomain}
-                stroke="#cbd5e1"
+                stroke={AXIS_STROKE}
                 fontSize={11}
-                tick={{ fill: '#64748b' }}
+                tick={{ fill: AXIS_TICK_FILL }}
                 unit={tab.unit}
                 width={44}
                 axisLine={false}
@@ -329,7 +395,7 @@ export default function PetTimelineChart({ petId, currentWeight, refreshKey = 0,
               />
               <Tooltip
                 content={<HoverTooltip tab={tab} />}
-                cursor={{ stroke: '#cbd5e1', strokeDasharray: '4 4' }}
+                cursor={{ stroke: AXIS_STROKE, strokeDasharray: '4 4' }}
               />
               <Line
                 type="monotone"
@@ -345,10 +411,16 @@ export default function PetTimelineChart({ petId, currentWeight, refreshKey = 0,
 
           {/* 点击 dot 弹出操作浮层（绝对定位在图表右上角，固定位置） */}
           {selectedPoint && (
-            <div className="absolute top-2 right-2 bg-white border border-slate-200 rounded-lg shadow-xl p-3 text-xs w-[220px] z-10">
+            <div
+              className="absolute top-2 right-2 rounded-lg shadow-xl p-3 text-xs w-[220px] z-10 border"
+              style={{
+                background: 'var(--v4-card)',
+                borderColor: 'var(--v4-line)',
+              }}
+            >
               <div className="flex items-start justify-between gap-2 mb-2">
                 <div>
-                  <div className="text-slate-400 text-[11px]">
+                  <div className="text-[11px]" style={{ color: 'var(--v4-faint)' }}>
                     {new Date(selectedPoint.ts).toLocaleString('zh-CN', {
                       year: 'numeric', month: '2-digit', day: '2-digit',
                       hour: '2-digit', minute: '2-digit',
@@ -358,13 +430,20 @@ export default function PetTimelineChart({ petId, currentWeight, refreshKey = 0,
                     <span className="text-lg font-semibold" style={{ color: tab.color }}>
                       {selectedPoint.value}
                     </span>
-                    {tab.unit && <span className="text-slate-500 text-xs">{tab.unit}</span>}
+                    {tab.unit && (
+                      <span className="text-xs" style={{ color: 'var(--v4-mute)' }}>
+                        {tab.unit}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setSelectedPoint(null)}
-                  className="text-slate-400 hover:text-slate-600 leading-none"
+                  className="leading-none transition"
+                  style={{ color: 'var(--v4-faint)' }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--v4-ink)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--v4-faint)')}
                   aria-label="close"
                 >
                   ✕
@@ -372,12 +451,18 @@ export default function PetTimelineChart({ petId, currentWeight, refreshKey = 0,
               </div>
 
               {selectedPoint.extra?.rationale && (
-                <div className="text-slate-500 mb-2 line-clamp-3 leading-relaxed">
+                <div
+                  className="mb-2 line-clamp-3 leading-relaxed"
+                  style={{ color: 'var(--v4-mute)' }}
+                >
                   💬 {selectedPoint.extra.rationale}
                 </div>
               )}
               {!selectedPoint.extra?.rationale && selectedPoint.note && (
-                <div className="text-slate-500 mb-2 line-clamp-3 leading-relaxed">
+                <div
+                  className="mb-2 line-clamp-3 leading-relaxed"
+                  style={{ color: 'var(--v4-mute)' }}
+                >
                   📝 {selectedPoint.note}
                 </div>
               )}
@@ -387,7 +472,11 @@ export default function PetTimelineChart({ petId, currentWeight, refreshKey = 0,
                   <button
                     type="button"
                     onClick={() => setLightboxSrc(selectedPoint.image_url)}
-                    className="flex-1 px-2.5 py-1.5 rounded-md bg-slate-100 text-slate-700 hover:bg-slate-200 transition text-[11px]"
+                    className="flex-1 px-2.5 py-1.5 rounded-md transition text-[11px]"
+                    style={{
+                      background: 'var(--v4-tint)',
+                      color: 'var(--v4-ink)',
+                    }}
                   >
                     🖼 查看原图
                   </button>
@@ -396,7 +485,11 @@ export default function PetTimelineChart({ petId, currentWeight, refreshKey = 0,
                   type="button"
                   onClick={handleDeletePoint}
                   disabled={deleting}
-                  className="flex-1 px-2.5 py-1.5 rounded-md bg-red-50 text-red-600 hover:bg-red-100 transition text-[11px] disabled:opacity-50"
+                  className="flex-1 px-2.5 py-1.5 rounded-md transition text-[11px] disabled:opacity-50"
+                  style={{
+                    background: 'var(--v4-warn-soft)',
+                    color: 'var(--v4-warn)',
+                  }}
                 >
                   {deleting ? '删除中…' : '🗑 删除'}
                 </button>
@@ -407,7 +500,7 @@ export default function PetTimelineChart({ petId, currentWeight, refreshKey = 0,
       )}
 
       {chartData.length > 0 && (
-        <p className="text-[11px] text-slate-400 mt-3 text-center">
+        <p className="text-[11px] mt-3 text-center" style={{ color: 'var(--v4-faint)' }}>
           {tabKey === 'weight'
             ? `共 ${chartData.length} 次称重 · 最近一次 ${latestPoint?.y} kg`
             : `共 ${chartData.length} 次评估 · 点击数据点查看详情`}
@@ -415,6 +508,6 @@ export default function PetTimelineChart({ petId, currentWeight, refreshKey = 0,
       )}
 
       {lightboxSrc && <Lightbox src={lightboxSrc} onClose={() => setLightboxSrc('')} />}
-    </section>
+    </V4Card>
   )
 }

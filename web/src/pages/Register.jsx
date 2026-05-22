@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { V4Btn, V4Card, Illo } from '../components/v4'
 
 export default function Register() {
   const { register } = useAuth()
@@ -26,18 +27,41 @@ export default function Register() {
     }
   }
 
+  const inputStyle = {
+    background: 'var(--v4-card)',
+    borderColor: 'var(--v4-line)',
+    color: 'var(--v4-ink)',
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-rose-50 px-4">
-      <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl p-8">
+    <div
+      className="min-h-screen flex items-center justify-center px-4"
+      style={{
+        background:
+          'linear-gradient(135deg, var(--v4-tint), var(--v4-accent-soft))',
+      }}
+    >
+      <V4Card padding="p-8" shadow="md" className="w-full max-w-sm rounded-2xl">
         <div className="text-center mb-6">
-          <div className="text-4xl mb-2">🐾</div>
-          <h1 className="text-2xl font-semibold text-slate-800">注册 PetPal</h1>
-          <p className="text-sm text-slate-400 mt-1">创建你的多模态宠物管家账号</p>
+          <div
+            className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-3"
+            style={{ background: 'var(--v4-accent-soft)' }}
+          >
+            <Illo name="cat-face" size={48} color="white" secondary="white" />
+          </div>
+          <h1 className="text-2xl font-semibold" style={{ color: 'var(--v4-ink)' }}>
+            注册 PetPal
+          </h1>
+          <p className="text-sm mt-1" style={{ color: 'var(--v4-faint)' }}>
+            创建你的多模态宠物管家账号
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
-            <label className="block text-xs text-slate-500 mb-1">显示名</label>
+            <label className="block text-xs mb-1" style={{ color: 'var(--v4-mute)' }}>
+              显示名
+            </label>
             <input
               type="text"
               value={name}
@@ -46,21 +70,27 @@ export default function Register() {
               maxLength={50}
               autoFocus
               placeholder="想被怎么称呼？"
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-400"
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none"
+              style={inputStyle}
             />
           </div>
           <div>
-            <label className="block text-xs text-slate-500 mb-1">邮箱</label>
+            <label className="block text-xs mb-1" style={{ color: 'var(--v4-mute)' }}>
+              邮箱
+            </label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-400"
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none"
+              style={inputStyle}
             />
           </div>
           <div>
-            <label className="block text-xs text-slate-500 mb-1">密码（至少 6 位）</label>
+            <label className="block text-xs mb-1" style={{ color: 'var(--v4-mute)' }}>
+              密码（至少 6 位）
+            </label>
             <input
               type="password"
               value={password}
@@ -68,32 +98,47 @@ export default function Register() {
               required
               minLength={6}
               maxLength={72}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-400"
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none"
+              style={inputStyle}
             />
           </div>
 
           {error && (
-            <div className="rounded-md bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">
+            <div
+              className="rounded-md px-3 py-2 text-xs border"
+              style={{
+                background: 'var(--v4-warn-soft)',
+                borderColor: 'var(--v4-warn)',
+                color: 'var(--v4-warn)',
+              }}
+            >
               {error}
             </div>
           )}
 
-          <button
+          <V4Btn
             type="submit"
+            variant="primary"
+            size="lg"
             disabled={submitting}
-            className="w-full bg-amber-500 hover:bg-amber-600 text-white rounded-lg py-2 text-sm transition disabled:opacity-50"
+            className="w-full"
+            icon="paw"
           >
             {submitting ? '注册中…' : '注册'}
-          </button>
+          </V4Btn>
         </form>
 
-        <p className="text-center text-xs text-slate-500 mt-5">
+        <p className="text-center text-xs mt-5" style={{ color: 'var(--v4-mute)' }}>
           已有账号？{' '}
-          <Link to="/login" className="text-amber-600 hover:text-amber-700">
+          <Link
+            to="/login"
+            className="transition"
+            style={{ color: 'var(--v4-accent-deep)' }}
+          >
             登录
           </Link>
         </p>
-      </div>
+      </V4Card>
     </div>
   )
 }

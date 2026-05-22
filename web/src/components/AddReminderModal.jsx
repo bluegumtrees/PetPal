@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
+import { V4Btn, Illo } from './v4'
 
 const TYPES = [
-  { key: 'vaccine', label: '💉 疫苗' },
-  { key: 'deworm', label: '🪱 驱虫' },
-  { key: 'bath', label: '🛁 洗澡' },
-  { key: 'medication', label: '💊 服药' },
-  { key: 'checkup', label: '🩺 体检' },
-  { key: 'other', label: '📝 其他' },
+  { key: 'vaccine', label: '疫苗', icon: 'syringe' },
+  { key: 'deworm', label: '驱虫', icon: 'drop' },
+  { key: 'bath', label: '洗澡', icon: 'bath' },
+  { key: 'medication', label: '服药', icon: 'sparkle' },
+  { key: 'checkup', label: '体检', icon: 'heart' },
+  { key: 'other', label: '其他', icon: 'leaf' },
 ]
 
 const REPEAT_OPTIONS = [
@@ -52,7 +53,6 @@ export default function AddReminderModal({ petId, defaults, onClose, onSubmitted
       setError('请选择提醒时间')
       return
     }
-    // 本地 datetime-local 字符串 → UTC ISO（JS 当本地时区解析后转 UTC）
     const utcIso = new Date(scheduledAt).toISOString()
     setSubmitting(true)
     try {
@@ -74,21 +74,34 @@ export default function AddReminderModal({ petId, defaults, onClose, onSubmitted
     }
   }
 
+  const inputStyle = {
+    background: 'var(--v4-card)',
+    borderColor: 'var(--v4-line)',
+    color: 'var(--v4-ink)',
+  }
+
   return (
     <div
-      className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      style={{ background: 'rgba(0,0,0,0.4)' }}
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl"
+        className="rounded-2xl max-w-md w-full p-6 shadow-2xl border"
+        style={{ background: 'var(--v4-card)', borderColor: 'var(--v4-line)' }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-5">
-          <h3 className="text-base font-medium text-slate-800">添加提醒</h3>
+          <h3 className="text-base font-semibold" style={{ color: 'var(--v4-ink)' }}>
+            添加提醒
+          </h3>
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 text-xl leading-none"
+            className="text-xl leading-none transition"
+            style={{ color: 'var(--v4-faint)' }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--v4-ink)')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--v4-faint)')}
             aria-label="close"
           >
             ✕
@@ -96,90 +109,114 @@ export default function AddReminderModal({ petId, defaults, onClose, onSubmitted
         </div>
 
         <div className="grid grid-cols-3 gap-2 mb-5">
-          {TYPES.map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => {
-                setType(t.key)
-                setError('')
-              }}
-              className={`px-2 py-2 rounded-lg text-xs transition ${
-                type === t.key
-                  ? 'bg-amber-100 text-amber-700 border-2 border-amber-300'
-                  : 'bg-slate-50 text-slate-600 border-2 border-transparent hover:bg-slate-100'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
+          {TYPES.map((t) => {
+            const active = type === t.key
+            return (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => {
+                  setType(t.key)
+                  setError('')
+                }}
+                className="px-2 py-3 rounded-lg text-xs transition border-2 inline-flex flex-col items-center justify-center gap-1"
+                style={{
+                  background: active ? 'var(--v4-accent-soft)' : 'var(--v4-tint)',
+                  color: active ? 'var(--v4-accent-deep)' : 'var(--v4-mute)',
+                  borderColor: active ? 'var(--v4-accent)' : 'transparent',
+                  fontWeight: active ? 600 : 500,
+                }}
+              >
+                <Illo
+                  name={t.icon}
+                  size={18}
+                  color={active ? 'var(--v4-accent-deep)' : 'var(--v4-mute)'}
+                />
+                {t.label}
+              </button>
+            )
+          })}
         </div>
 
         <div className="space-y-3">
           <div>
-            <label className="block text-xs text-slate-500 mb-1">提醒时间</label>
+            <label className="block text-xs mb-1" style={{ color: 'var(--v4-mute)' }}>
+              提醒时间
+            </label>
             <input
               type="datetime-local"
               value={scheduledAt}
               onChange={(e) => setScheduledAt(e.target.value)}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-400"
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none"
+              style={inputStyle}
             />
-            <p className="text-[11px] text-slate-400 mt-1">
-              ⓘ 本地时间（Asia/Shanghai）。到点会发邮件提醒（未配置 SMTP 时控制台打印）。
+            <p className="text-[11px] mt-1" style={{ color: 'var(--v4-faint)' }}>
+              ⓘ 本地时间（Asia/Shanghai）。到点会发邮件提醒。
             </p>
           </div>
 
           <div>
-            <label className="block text-xs text-slate-500 mb-1">备注</label>
+            <label className="block text-xs mb-1" style={{ color: 'var(--v4-mute)' }}>
+              备注
+            </label>
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               placeholder="例如：猫三联第二针 / 拜耳驱虫片"
               rows={2}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-400 resize-none"
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none resize-none"
+              style={inputStyle}
             />
           </div>
 
           <div>
-            <label className="block text-xs text-slate-500 mb-1">重复（仅显示标签，MVP 不真重复）</label>
+            <label className="block text-xs mb-1" style={{ color: 'var(--v4-mute)' }}>
+              重复（仅显示标签，MVP 不真重复）
+            </label>
             <select
               value={repeatRule}
               onChange={(e) => setRepeatRule(e.target.value)}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-amber-400"
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none"
+              style={inputStyle}
             >
               {REPEAT_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
               ))}
             </select>
-            <p className="text-[11px] text-slate-400 mt-1">
+            <p className="text-[11px] mt-1" style={{ color: 'var(--v4-faint)' }}>
               ⓘ 提醒发出后会显示"再加一条"按钮，一键预填下个周期。
             </p>
           </div>
         </div>
 
         {error && (
-          <div className="mt-3 rounded-md bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">
+          <div
+            className="mt-3 rounded-md px-3 py-2 text-xs border"
+            style={{
+              background: 'var(--v4-warn-soft)',
+              borderColor: 'var(--v4-warn)',
+              color: 'var(--v4-warn)',
+            }}
+          >
             {error}
           </div>
         )}
 
         <div className="mt-5 flex gap-2 justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={submitting}
-            className="px-4 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100 transition disabled:opacity-50"
-          >
+          <V4Btn variant="ghost" size="md" onClick={onClose} disabled={submitting}>
             取消
-          </button>
-          <button
-            type="button"
+          </V4Btn>
+          <V4Btn
+            variant="primary"
+            size="md"
             onClick={handleSubmit}
             disabled={submitting}
-            className="px-5 py-2 rounded-lg text-sm bg-amber-500 text-white hover:bg-amber-600 transition disabled:opacity-50"
+            icon="bell"
           >
             {submitting ? '保存中…' : '保存'}
-          </button>
+          </V4Btn>
         </div>
       </div>
     </div>

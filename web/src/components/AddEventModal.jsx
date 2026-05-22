@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
+import { V4Btn, Illo } from './v4'
 
 const TYPES = [
-  { key: 'vaccine', label: '💉 疫苗' },
-  { key: 'grooming', label: '🛁 洗澡' },
-  { key: 'symptom', label: '🤒 症状' },
+  { key: 'vaccine', label: '疫苗', icon: 'syringe' },
+  { key: 'grooming', label: '洗澡', icon: 'bath' },
+  { key: 'symptom', label: '症状', icon: 'drop' },
 ]
 
 function nowLocalDatetimeValue() {
@@ -50,7 +51,6 @@ export default function AddEventModal({ petId, onClose, onSubmitted }) {
         payload.severity = 'medium'
         payload.source = 'manual'
       }
-      // grooming 只有时间和备注，payload 空对象即可
       await api('/api/events', {
         method: 'POST',
         body: {
@@ -69,21 +69,34 @@ export default function AddEventModal({ petId, onClose, onSubmitted }) {
     }
   }
 
+  const inputStyle = {
+    background: 'var(--v4-card)',
+    borderColor: 'var(--v4-line)',
+    color: 'var(--v4-ink)',
+  }
+
   return (
     <div
-      className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      style={{ background: 'rgba(0,0,0,0.4)' }}
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl"
+        className="rounded-2xl max-w-md w-full p-6 shadow-2xl border"
+        style={{ background: 'var(--v4-card)', borderColor: 'var(--v4-line)' }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-5">
-          <h3 className="text-base font-medium text-slate-800">添加事件</h3>
+          <h3 className="text-base font-semibold" style={{ color: 'var(--v4-ink)' }}>
+            添加事件
+          </h3>
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 text-xl leading-none"
+            className="text-xl leading-none transition"
+            style={{ color: 'var(--v4-faint)' }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--v4-ink)')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--v4-faint)')}
             aria-label="close"
           >
             ✕
@@ -91,35 +104,48 @@ export default function AddEventModal({ petId, onClose, onSubmitted }) {
         </div>
 
         <div className="grid grid-cols-3 gap-2 mb-5">
-          {TYPES.map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => {
-                setType(t.key)
-                setError('')
-              }}
-              className={`px-2 py-2 rounded-lg text-xs transition ${
-                type === t.key
-                  ? 'bg-amber-100 text-amber-700 border-2 border-amber-300'
-                  : 'bg-slate-50 text-slate-600 border-2 border-transparent hover:bg-slate-100'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
+          {TYPES.map((t) => {
+            const active = type === t.key
+            return (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => {
+                  setType(t.key)
+                  setError('')
+                }}
+                className="px-2 py-3 rounded-lg text-xs transition border-2 inline-flex flex-col items-center justify-center gap-1"
+                style={{
+                  background: active ? 'var(--v4-accent-soft)' : 'var(--v4-tint)',
+                  color: active ? 'var(--v4-accent-deep)' : 'var(--v4-mute)',
+                  borderColor: active ? 'var(--v4-accent)' : 'transparent',
+                  fontWeight: active ? 600 : 500,
+                }}
+              >
+                <Illo
+                  name={t.icon}
+                  size={20}
+                  color={active ? 'var(--v4-accent-deep)' : 'var(--v4-mute)'}
+                />
+                {t.label}
+              </button>
+            )
+          })}
         </div>
 
         <div className="space-y-3">
           {type === 'vaccine' && (
             <div>
-              <label className="block text-xs text-slate-500 mb-1">疫苗名称</label>
+              <label className="block text-xs mb-1" style={{ color: 'var(--v4-mute)' }}>
+                疫苗名称
+              </label>
               <input
                 type="text"
                 value={vaccineName}
                 onChange={(e) => setVaccineName(e.target.value)}
                 placeholder="例如 猫三联 / 狂犬"
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-400"
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2"
+                style={inputStyle}
                 autoFocus
               />
             </div>
@@ -127,62 +153,74 @@ export default function AddEventModal({ petId, onClose, onSubmitted }) {
 
           {type === 'symptom' && (
             <div>
-              <label className="block text-xs text-slate-500 mb-1">症状描述</label>
+              <label className="block text-xs mb-1" style={{ color: 'var(--v4-mute)' }}>
+                症状描述
+              </label>
               <textarea
                 value={symptomDesc}
                 onChange={(e) => setSymptomDesc(e.target.value)}
                 placeholder="例如：早上吐了两次黄水"
                 rows={3}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-400 resize-none"
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 resize-none"
+                style={inputStyle}
                 autoFocus
               />
             </div>
           )}
 
           <div>
-            <label className="block text-xs text-slate-500 mb-1">发生时间</label>
+            <label className="block text-xs mb-1" style={{ color: 'var(--v4-mute)' }}>
+              发生时间
+            </label>
             <input
               type="datetime-local"
               value={happenedAt}
               onChange={(e) => setHappenedAt(e.target.value)}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-400"
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2"
+              style={inputStyle}
             />
           </div>
           <div>
-            <label className="block text-xs text-slate-500 mb-1">备注（可选）</label>
+            <label className="block text-xs mb-1" style={{ color: 'var(--v4-mute)' }}>
+              备注（可选）
+            </label>
             <input
               type="text"
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="备注信息"
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-400"
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2"
+              style={inputStyle}
             />
           </div>
         </div>
 
         {error && (
-          <div className="mt-3 rounded-md bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">
+          <div
+            className="mt-3 rounded-md px-3 py-2 text-xs border"
+            style={{
+              background: 'var(--v4-warn-soft)',
+              borderColor: 'var(--v4-warn)',
+              color: 'var(--v4-warn)',
+            }}
+          >
             {error}
           </div>
         )}
 
         <div className="mt-5 flex gap-2 justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={submitting}
-            className="px-4 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100 transition disabled:opacity-50"
-          >
+          <V4Btn variant="ghost" size="md" onClick={onClose} disabled={submitting}>
             取消
-          </button>
-          <button
-            type="button"
+          </V4Btn>
+          <V4Btn
+            variant="primary"
+            size="md"
             onClick={handleSubmit}
             disabled={submitting}
-            className="px-5 py-2 rounded-lg text-sm bg-amber-500 text-white hover:bg-amber-600 transition disabled:opacity-50"
+            icon="sparkle"
           >
             {submitting ? '保存中…' : '保存'}
-          </button>
+          </V4Btn>
         </div>
       </div>
     </div>

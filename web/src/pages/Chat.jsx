@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, streamChat } from '../api'
 import ChatInput from '../components/ChatInput'
@@ -14,7 +14,9 @@ import VLMCard from '../components/VLMCard'
 import Avatar from '../components/Avatar'
 import { useToast } from '../components/Toast'
 import { usePets } from '../context/PetContext'
+import { useProvideSidebarProps } from '../context/SidebarContext'
 import useSession from '../hooks/useSession'
+import { V4Btn, V4Card, Illo } from '../components/v4'
 
 /**
  * @typedef {Object} QuickPrompt
@@ -152,10 +154,10 @@ export default function Chat() {
       .finally(() => setHistoryLoading(false))
   }, [sessionId])
 
-  // 自动滚到底
+  // 自动滚到底（用 window scroll，因为消息流不再 inside scroll）
   useEffect(() => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+      scrollRef.current.scrollIntoView({ behavior: 'auto', block: 'end' })
     }
   }, [blocks])
 
@@ -172,6 +174,28 @@ export default function Chat() {
     setBlocks([])
     toast('已开始新对话', { kind: 'success' })
   }, [newSession, isStreaming, toast])
+
+  // 把 sidebar 控制 props 注入 SidebarContext（移动端 Header 抽屉读取）
+  useProvideSidebarProps({
+    currentSessionId: sessionId,
+    onSelectSession: useCallback(
+      (sid) => {
+        if (isStreaming) {
+          toast('请等当前对话完成', { kind: 'error' })
+          return
+        }
+        switchTo(sid)
+        setBlocks([])
+      },
+      [isStreaming, switchTo, toast]
+    ),
+    onCurrentSessionDeleted: useCallback(() => {
+      newSession()
+      setBlocks([])
+      toast('当前对话已删除，已开新对话', { kind: 'success' })
+    }, [newSession, toast]),
+    onNewSession: handleNewSession,
+  })
 
   const handleCancel = useCallback(() => {
     if (abortRef.current) {
@@ -341,54 +365,76 @@ export default function Chat() {
 
   // 空 / 无宠物 时
   if (petsLoading) {
-    return <p className="text-sm text-slate-400 text-center py-10">加载中…</p>
+    return (
+      <p className="text-sm text-center py-10" style={{ color: 'var(--v4-faint)' }}>
+        加载中…
+      </p>
+    )
   }
   if (pets.length === 0) {
     return (
-      <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center shadow-sm">
-        <span className="text-5xl">🐾</span>
-        <h2 className="text-xl font-semibold text-slate-800 mt-3 mb-1">和 PetPal 聊天前</h2>
-        <p className="text-sm text-slate-500 mb-6">先建一只宠物档案，agent 才能基于它给出建议</p>
-        <Link
-          to="/pets/new"
-          className="inline-block bg-amber-500 hover:bg-amber-600 text-white px-5 py-2.5 rounded-xl transition"
+      <V4Card padding="p-10" className="text-center shadow-sm rounded-2xl">
+        <div
+          className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-3"
+          style={{ background: 'var(--v4-accent-soft)' }}
         >
-          + 新建宠物
+          <Illo name="paw" size={36} color="var(--v4-accent-deep)" />
+        </div>
+        <h2 className="text-xl font-semibold mb-1" style={{ color: 'var(--v4-ink)' }}>
+          和 PetPal 聊天前
+        </h2>
+        <p className="text-sm mb-6" style={{ color: 'var(--v4-mute)' }}>
+          先建一只宠物档案，agent 才能基于它给出建议
+        </p>
+        <Link to="/pets/new">
+          <V4Btn variant="primary" size="lg" icon="sparkle">
+            + 新建宠物
+          </V4Btn>
         </Link>
-      </div>
+      </V4Card>
     )
   }
 
   const isEmpty = blocks.length === 0
 
   return (
-    <div className="flex flex-col" style={{ minHeight: 'calc(100vh - 60px - 60px)' }}>
+    <div className="flex flex-col" style={{ minHeight: 'calc(100dvh - 60px)' }}>
       {/* session 工具栏 */}
-      <div className="relative flex items-center gap-3 mb-4 pb-3 border-b border-slate-200">
+      <div
+        className="relative flex items-center gap-3 mb-4 pb-3 border-b"
+        style={{ borderColor: 'var(--v4-line)' }}
+      >
         <Avatar pet={activePet} size={36} />
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-slate-700">{activePet.name}</p>
-          <p className="text-[10px] text-slate-400 font-mono truncate">
+          <p className="text-sm font-medium" style={{ color: 'var(--v4-ink)' }}>
+            {activePet.name}
+          </p>
+          <p className="text-[10px] font-mono truncate" style={{ color: 'var(--v4-faint)' }}>
             session: {sessionId?.slice(0, 8)}…
           </p>
         </div>
-        <button
-          type="button"
+        {/* 桌面端「历史」弹层；移动端通过 hamburger 抽屉里的 Sidebar 看历史 */}
+        <V4Btn
+          variant="secondary"
+          size="sm"
+          icon="bell"
           data-session-list-trigger
           onClick={() => setShowHistory((v) => !v)}
           disabled={isStreaming}
-          className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-50 disabled:opacity-40 transition"
+          className="disabled:opacity-40 hidden md:inline-flex"
         >
-          📜 历史
-        </button>
-        <button
-          type="button"
+          历史
+        </V4Btn>
+        <V4Btn
+          variant="primary"
+          size="sm"
+          icon="sparkle"
           onClick={handleNewSession}
           disabled={isStreaming}
-          className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-50 disabled:opacity-40 transition"
+          className="disabled:opacity-40"
         >
-          + 新对话
-        </button>
+          新对话
+        </V4Btn>
 
         {showHistory && activePet && (
           <SessionList
@@ -413,14 +459,12 @@ export default function Chat() {
         )}
       </div>
 
-      {/* 消息流 */}
-      <div
-        ref={scrollRef}
-        className="flex-1 overflow-y-auto pb-4"
-        style={{ minHeight: '300px' }}
-      >
+      {/* 消息流：去掉 inside scroll，让窗口整体滚（保留 ref 给末尾 anchor 用） */}
+      <div className="flex-1 pb-4">
         {historyLoading && (
-          <p className="text-xs text-slate-400 text-center py-2">加载历史中…</p>
+          <p className="text-xs text-center py-2" style={{ color: 'var(--v4-faint)' }}>
+            加载历史中…
+          </p>
         )}
 
         {isEmpty && !historyLoading && (
@@ -459,15 +503,20 @@ export default function Chat() {
         })}
 
         {isStreaming && (
-          <div className="text-xs text-slate-400 text-center py-1">
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse mr-1" />
+          <div className="text-xs text-center py-1" style={{ color: 'var(--v4-faint)' }}>
+            <span
+              className="inline-block w-1.5 h-1.5 rounded-full animate-pulse mr-1"
+              style={{ background: 'var(--v4-accent)' }}
+            />
             思考中…
           </div>
         )}
+        {/* anchor for auto-scroll-to-bottom (window-level scroll) */}
+        <div ref={scrollRef} />
       </div>
 
-      {/* 输入区 */}
-      <div className="mt-auto -mx-6 -mb-20">
+      {/* 输入区：sticky bottom 让 input 始终在视口底（无论窗口是否滚动） */}
+      <div className="sticky bottom-0 -mx-3 sm:-mx-6 z-[5]">
         <ChatInput
           key={'in-' + inputDraftSeed}
           initialText={inputDraft}
@@ -485,9 +534,16 @@ export default function Chat() {
 function EmptyHero({ onQuickPick }) {
   return (
     <div className="text-center py-8">
-      <span className="text-4xl">🐾</span>
-      <h2 className="text-lg font-semibold text-slate-800 mt-2">和 PetPal 聊聊</h2>
-      <p className="text-sm text-slate-500 mt-1 mb-6">
+      <div
+        className="inline-flex items-center justify-center w-16 h-16 rounded-full shadow-sm"
+        style={{ background: 'var(--v4-accent-soft)' }}
+      >
+        <Illo name="cat-face" size={48} color="white" secondary="white" />
+      </div>
+      <h2 className="text-lg font-semibold mt-3" style={{ color: 'var(--v4-ink)' }}>
+        和 PetPal 聊聊
+      </h2>
+      <p className="text-sm mt-1 mb-6" style={{ color: 'var(--v4-mute)' }}>
         多模态 agent：拍照 / 文字 / 询问医院 / 行为分析都可以
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-md mx-auto">
@@ -496,18 +552,31 @@ function EmptyHero({ onQuickPick }) {
             key={p.label}
             type="button"
             onClick={() => onQuickPick(p)}
-            className="text-left bg-white border border-slate-200 rounded-xl p-3 hover:border-amber-300 hover:shadow-md transition group"
+            className="text-left rounded-xl p-3 border transition group hover:shadow-md"
+            style={{
+              background: 'var(--v4-card)',
+              borderColor: 'var(--v4-line)',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = 'var(--v4-accent)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = 'var(--v4-line)'
+            }}
           >
-            <p className="text-sm font-medium text-slate-700 group-hover:text-amber-600 transition">
+            <p
+              className="text-sm font-medium transition group-hover:underline"
+              style={{ color: 'var(--v4-ink)' }}
+            >
               {p.label}
             </p>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs mt-0.5" style={{ color: 'var(--v4-faint)' }}>
               {p.autoSend ? p.hint : `📎 ${p.hint}`}
             </p>
           </button>
         ))}
       </div>
-      <p className="text-[10px] text-slate-400 mt-4">
+      <p className="text-[10px] mt-4" style={{ color: 'var(--v4-faint)' }}>
         含 📎 的预设点击后只填到输入框，需要你补图片或改地址后再发送
       </p>
     </div>

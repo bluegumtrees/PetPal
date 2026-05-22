@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { usePets } from '../context/PetContext'
 import PetCard from '../components/PetCard'
+import { V4Btn, V4Card, Illo } from '../components/v4'
 
 export default function PetList() {
   const { pets, loading, error } = usePets()
@@ -8,30 +9,56 @@ export default function PetList() {
   return (
     <div>
       <div className="flex items-center justify-between mb-5">
-        <h2 className="text-xl font-semibold text-slate-800">
+        <h2 className="text-xl font-semibold inline-flex items-center gap-2" style={{ color: 'var(--v4-ink)' }}>
+          <Illo name="paw" size={18} color="var(--v4-accent)" />
           所有宠物{' '}
-          <span className="text-sm font-normal text-slate-400">({pets.length})</span>
+          <span className="text-sm font-normal" style={{ color: 'var(--v4-faint)' }}>
+            ({pets.length})
+          </span>
         </h2>
-        <Link
-          to="/pets/new"
-          className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-sm transition"
-        >
-          + 新建宠物
+        <Link to="/pets/new">
+          <V4Btn variant="primary" size="md" icon="sparkle">
+            新建宠物
+          </V4Btn>
         </Link>
       </div>
 
       {error && (
-        <div className="rounded-lg bg-red-50 border border-red-200 p-3 mb-4 text-sm text-red-700">
+        <div
+          className="rounded-lg p-3 mb-4 text-sm border"
+          style={{
+            background: 'var(--v4-warn-soft)',
+            borderColor: 'var(--v4-warn)',
+            color: 'var(--v4-warn)',
+          }}
+        >
           {error}
         </div>
       )}
 
       {loading ? (
-        <p className="text-sm text-slate-400 text-center py-10">加载中…</p>
+        <p className="text-sm text-center py-10" style={{ color: 'var(--v4-faint)' }}>
+          加载中…
+        </p>
       ) : pets.length === 0 ? (
-        <div className="bg-white rounded-xl border border-dashed border-slate-300 p-8 text-center">
-          <p className="text-sm text-slate-500 mb-3">还没有宠物</p>
-          <Link to="/pets/new" className="text-amber-600 hover:underline text-sm">
+        <div
+          className="rounded-xl border-2 border-dashed p-8 text-center"
+          style={{ borderColor: 'var(--v4-line)' }}
+        >
+          <div
+            className="inline-flex items-center justify-center w-14 h-14 rounded-full mb-3"
+            style={{ background: 'var(--v4-accent-soft)' }}
+          >
+            <Illo name="cat-face" size={40} color="white" secondary="white" />
+          </div>
+          <p className="text-sm mb-3" style={{ color: 'var(--v4-mute)' }}>
+            还没有宠物
+          </p>
+          <Link
+            to="/pets/new"
+            className="text-sm transition"
+            style={{ color: 'var(--v4-accent-deep)' }}
+          >
             添加第一只宠物 →
           </Link>
         </div>
@@ -41,9 +68,17 @@ export default function PetList() {
             <Link
               key={pet.id}
               to={`/pets/${pet.id}`}
-              className="block bg-white rounded-xl border border-slate-200 p-4 shadow-sm hover:shadow-md hover:border-amber-300 transition"
+              className="block transition"
+              onMouseEnter={(e) => {
+                e.currentTarget.firstChild.style.borderColor = 'var(--v4-accent)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.firstChild.style.borderColor = 'var(--v4-line)'
+              }}
             >
-              <PetCard pet={pet} />
+              <V4Card padding="p-4" shadow="sm" className="rounded-xl">
+                <PetCard pet={pet} />
+              </V4Card>
             </Link>
           ))}
         </div>
