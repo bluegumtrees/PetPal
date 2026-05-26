@@ -188,7 +188,19 @@ task = {task}
 - `milestone` — 训练/社会化里程碑（"学会握手"），payload: `title + description`
 - `note` — 其他有趣观察或备忘（"今天主动凑过来"），payload: `text`
 
-playload 合并到一个 dict，**不要拆多次调**。
+payload 合并到一个 dict，**不要拆多次调**。
+
+**评估型事件（emotion / bcs / pain_fgs）特别规则——VLM 评了什么决定存什么**：
+
+看「你看到的图片」块头部的 `task=X` 字段——本轮 VLM 做了什么评估，
+就存对应类型的事件，关键字段直接抄 VLM 输出：
+
+- `task=emotion` → 存 emotion 事件，`main_emotion` + `confidence` 抄 VLM 的 `candidate_emotions[0]`
+- `task=bcs` → 存 bcs 事件，`bcs_score` + `rationale` 抄 VLM
+- `task=pain_fgs` → 存 pain_fgs 事件，`total_score` + `normalized` 抄 VLM
+- `task=symptom` / `task=chat` / 无图片块 → 这三类事件这轮跳过，留给主人下次明确请求评估时再做
+
+这三类事件的关键字段是数据透传（VLM 客观输出），不是你估算的判断。
 
 ## 4. 其他工具
 
@@ -245,10 +257,10 @@ playload 合并到一个 dict，**不要拆多次调**。
 
 
 def _vlm_task_for(task: Task) -> str:
-    """task → VLM 应该用哪个 prompt。chat 也用 symptom（取通用 observation）。"""
+    """task → VLM 应该用哪个 prompt。chat 走专属 CHAT_PROMPT（温暖观察，不医学化）。"""
     if task in ('symptom', 'emotion', 'bcs', 'pain_fgs'):
         return task
-    return 'symptom'  # chat 也走 symptom，但只取 observation 字段
+    return 'chat'
 
 
 def run_agent(
@@ -836,28 +848,20 @@ async def run_agent_stream(
             # 无 tool_call → 可能 final，也可能"光说不做"
             if not msg.tool_calls:
                 final = msg.content or ''
-                # 兜底：检测 LLM 光说不做（过渡语没真调 tool），追加 system 提示让它继续
+                # 兜底：检测 LLM 光说不做（过渡语没真调 tool），静默注入 system 提示让它继续
+                # 不 yield + 不持久化——避免前端出现"重复 motivation"的尴尬 UX；
+                # 这次的 transition 是失败的尝试，对用户没意义，让下一轮 Qwen 带 tool_calls 重写即可
                 if _looks_like_transition_only(final) and iteration < max_iter - 1:
-                    yield {'type': 'assistant_thinking', 'content': final}
-                    # 持久化这段过渡为 intermediate
-                    _persist_message(
-                        db,
-                        session_id=session_id,
-                        pet_id=pet_id,
-                        user_id=user_id,
-                        role='assistant',
-                        content=final,
-                        task=task,
-                        is_intermediate=True,
-                    )
                     messages.append({
                         'role': 'system',
                         'content': (
                             '注意：你刚说要执行某个操作（如查知识库 / 记录事件），但**没有真的调 tool**。'
                             '请立即调用相应的 tool 真正执行——只说不做等于放弃任务。'
+                            '注意：你这条没带 tool_calls 的回复已被系统识别为失败尝试丢弃，'
+                            '请重新输出一条**带 tool_calls 的完整动作**（content 可以重写）。'
                         ),
                     })
-                    continue  # 进入下一轮 iter，让 LLM 真去调
+                    continue  # 静默进入下一轮 iter，让 LLM 真去调
 
                 # 正常 final
                 _persist_message(
