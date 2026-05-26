@@ -35,7 +35,7 @@ function Layout() {
               : ''
           }
         >
-          <main className="max-w-3xl mx-auto p-3 sm:p-6 pb-20 min-w-0 w-full">
+          <main className="max-w-3xl mx-auto p-3 sm:p-6 min-w-0 w-full">
             <Outlet />
           </main>
         </div>

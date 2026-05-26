@@ -154,7 +154,7 @@ export default function Chat() {
       .finally(() => setHistoryLoading(false))
   }, [sessionId])
 
-  // 自动滚到底（用 window scroll，因为消息流不再 inside scroll）
+  // 自动滚到底（scrollIntoView 会用最近的可滚动祖先，这里就是 messages div）
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollIntoView({ behavior: 'auto', block: 'end' })
@@ -398,8 +398,11 @@ export default function Chat() {
   const isEmpty = blocks.length === 0
 
   return (
-    <div className="flex flex-col" style={{ minHeight: 'calc(100dvh - 60px)' }}>
-      {/* session 工具栏 */}
+    // 固定高度 = 视口 - 顶部Header(60) - main的上下padding (移动:p-3=24; sm+:p-6=48)
+    // 内部用 flex column：toolbar shrink-0 | messages flex-1 overflow-y-auto | input shrink-0
+    <div className="flex flex-col h-[calc(100dvh-84px)] sm:h-[calc(100dvh-108px)]">
+      {/* session 工具栏（移到 scrollable 区域内部，跟随消息一起滚走，给 messages 让位）*/}
+      <div className="flex-1 overflow-y-auto scrollbar-hide pb-4 min-h-0">
       <div
         className="relative flex items-center gap-3 mb-4 pb-3 border-b"
         style={{ borderColor: 'var(--v4-line)' }}
@@ -459,8 +462,7 @@ export default function Chat() {
         )}
       </div>
 
-      {/* 消息流：去掉 inside scroll，让窗口整体滚（保留 ref 给末尾 anchor 用） */}
-      <div className="flex-1 pb-4">
+      {/* 消息流（与 toolbar 共享 scrollable 区域；toolbar 上滑后释放高度给 messages）*/}
         {historyLoading && (
           <p className="text-xs text-center py-2" style={{ color: 'var(--v4-faint)' }}>
             加载历史中…
@@ -515,8 +517,8 @@ export default function Chat() {
         <div ref={scrollRef} />
       </div>
 
-      {/* 输入区：sticky bottom 让 input 始终在视口底（无论窗口是否滚动） */}
-      <div className="sticky bottom-0 -mx-3 sm:-mx-6 z-[5]">
+      {/* 输入区：shrink-0 在 flex column 底部固定，不会被消息流挤压 */}
+      <div className="shrink-0 -mx-3 sm:-mx-6">
         <ChatInput
           key={'in-' + inputDraftSeed}
           initialText={inputDraft}

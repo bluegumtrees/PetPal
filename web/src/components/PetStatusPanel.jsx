@@ -79,8 +79,9 @@ function StatCard({ tone, label, value, sub, iconName }) {
   )
 }
 
-/** 右抽屉/侧栏：宠物状态面板（V2 反转配色：深底 panel + 白卡片 + 列表事件） */
-export default function PetStatusPanel({ onClose, onNavigate }) {
+/** 右抽屉/侧栏：宠物状态面板（V2 反转配色：深底 panel + 白卡片 + 列表事件）
+ *  compact=true：桌面端 docked 模式，省略顶部标题栏（关闭按钮已在 Header 里）*/
+export default function PetStatusPanel({ onClose, onNavigate, compact = false }) {
   const { activePet } = usePets()
   const [events, setEvents] = useState([])
   const [reminders, setReminders] = useState([])
@@ -121,23 +122,25 @@ export default function PetStatusPanel({ onClose, onNavigate }) {
   if (!activePet) {
     return (
       <>
-        <div
-          className="flex items-center justify-between px-4 py-2.5 border-b shrink-0"
-          style={{ borderColor: 'var(--v4-line)' }}
-        >
-          <h2 className="text-sm font-semibold" style={{ color: 'var(--v4-ink)' }}>
-            宠物状态
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-xl leading-none p-1"
-            style={{ color: 'var(--v4-faint)' }}
-            aria-label="关闭"
+        {!compact && (
+          <div
+            className="flex items-center justify-between px-4 py-2.5 border-b shrink-0"
+            style={{ borderColor: 'var(--v4-line)' }}
           >
-            ✕
-          </button>
-        </div>
+            <h2 className="text-sm font-semibold" style={{ color: 'var(--v4-ink)' }}>
+              宠物状态
+            </h2>
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-xl leading-none p-1"
+              style={{ color: 'var(--v4-faint)' }}
+              aria-label="关闭"
+            >
+              ✕
+            </button>
+          </div>
+        )}
         <div className="flex-1 flex items-center justify-center p-6 text-center">
           <p className="text-sm" style={{ color: 'var(--v4-mute)' }}>
             还没有选定宠物
@@ -155,35 +158,37 @@ export default function PetStatusPanel({ onClose, onNavigate }) {
 
   return (
     <>
-      {/* 顶部关闭 */}
-      <div
-        className="flex items-center justify-between px-4 py-2.5 border-b shrink-0"
-        style={{ borderColor: 'var(--v4-line)' }}
-      >
-        <h2 className="text-sm font-semibold" style={{ color: 'var(--v4-ink)' }}>
-          宠物状态
-        </h2>
-        <button
-          type="button"
-          onClick={onClose}
-          className="text-xl leading-none p-1"
-          style={{ color: 'var(--v4-faint)' }}
-          aria-label="关闭"
+      {/* 顶部关闭（compact 模式隐藏：桌面端 docked 不需要标题栏，关闭按钮已在 Header）*/}
+      {!compact && (
+        <div
+          className="flex items-center justify-between px-4 py-2.5 border-b shrink-0"
+          style={{ borderColor: 'var(--v4-line)' }}
         >
-          ✕
-        </button>
-      </div>
+          <h2 className="text-sm font-semibold" style={{ color: 'var(--v4-ink)' }}>
+            宠物状态
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-xl leading-none p-1"
+            style={{ color: 'var(--v4-faint)' }}
+            aria-label="关闭"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* 主区（panel 内部 scroll，隐藏滚动条但保留滚动功能） */}
       <div className="flex-1 overflow-y-auto scrollbar-hide px-3 py-3 pb-6 space-y-3">
-        {/* 头像 + 信息（横向，节省高度） */}
+        {/* 头像 + 信息（头像放大占左 ~1/3 panel 宽度，名字信息右排） */}
         <div className="flex items-center gap-3">
-          <Avatar pet={activePet} size={52} className="shrink-0" />
+          <Avatar pet={activePet} size={96} className="shrink-0" />
           <div className="flex-1 min-w-0">
-            <h3 className="text-base font-bold truncate" style={{ color: 'var(--v4-ink)' }}>
+            <h3 className="text-lg font-bold truncate" style={{ color: 'var(--v4-ink)' }}>
               {activePet.name}
             </h3>
-            <p className="text-[11px] truncate" style={{ color: 'var(--v4-mute)' }}>
+            <p className="text-xs truncate mt-0.5" style={{ color: 'var(--v4-mute)' }}>
               {SPECIES_ZH[activePet.species] || activePet.species}
               {activePet.breed && <> · {activePet.breed}</>}
               {activePet.gender && <> · {activePet.gender === 'male' ? '公' : activePet.gender === 'female' ? '母' : ''}</>}
