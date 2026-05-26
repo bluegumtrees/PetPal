@@ -11,6 +11,7 @@ services:
       - PETPAL_DEV_MODE=0   # 生产关掉 dev trigger_now
     volumes:
       - ./data:/app/data  # 整个 data 目录持久化（含 vet_kb + uploads + petpal.db + chroma）
+      - /root/.cache/huggingface:/root/.cache/huggingface  # RAG 模型（BGE embed/rerank）从宿主挂入，避免容器内重下
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
