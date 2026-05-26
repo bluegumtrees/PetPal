@@ -9,6 +9,8 @@ services:
     env_file: .env
     environment:
       - PETPAL_DEV_MODE=0   # 生产关掉 dev trigger_now
+      - HF_HUB_OFFLINE=1    # 强制 HF 库用本地 cache，不联网 check（ECS 上 hf-mirror 不稳）
+      - TRANSFORMERS_OFFLINE=1  # 老版本 transformers 走这个 env var
     volumes:
       - ./data:/app/data  # 整个 data 目录持久化（含 vet_kb + uploads + petpal.db + chroma）
       - /root/.cache/huggingface:/root/.cache/huggingface  # RAG 模型（BGE embed/rerank）从宿主挂入，避免容器内重下
