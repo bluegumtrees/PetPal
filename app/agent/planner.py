@@ -809,8 +809,10 @@ async def run_agent_stream(
         # gpt-4o-mini 偶尔会把同一事件存两次或把症状/情绪拆开重复存
         saved_event_keys: set[tuple] = set()
 
+        sid_short = session_id[:8] if session_id else '?'
         for iteration in range(max_iter):
             yield {'type': 'iter_start', 'iter': iteration + 1}
+            print(f'[stream] iter {iteration+1}/{max_iter} session={sid_short} task={task} → LLM...', flush=True)
 
             try:
                 resp = await asyncio.to_thread(
@@ -823,10 +825,14 @@ async def run_agent_stream(
                     )
                 )
             except Exception as e:
+                print(f'[stream]   ✗ LLM call failed: {e}', flush=True)
                 yield {'type': 'error', 'detail': f'LLM call failed: {e}'}
                 return
 
             msg = resp.choices[0].message
+            _content_preview = (msg.content or '').replace('\n', ' ')[:100]
+            _tools_preview = [tc.function.name for tc in msg.tool_calls] if msg.tool_calls else []
+            print(f'[stream]   content={_content_preview!r} tools={_tools_preview}', flush=True)
             assistant_msg: dict[str, Any] = {
                 'role': 'assistant',
                 'content': msg.content or '',
@@ -852,6 +858,7 @@ async def run_agent_stream(
                 # 不 yield + 不持久化——避免前端出现"重复 motivation"的尴尬 UX；
                 # 这次的 transition 是失败的尝试，对用户没意义，让下一轮 Qwen 带 tool_calls 重写即可
                 if _looks_like_transition_only(final) and iteration < max_iter - 1:
+                    print(f'[stream]   ⟲ silent transition retry (content looked like 光说不做)', flush=True)
                     messages.append({
                         'role': 'system',
                         'content': (
@@ -876,6 +883,7 @@ async def run_agent_stream(
                 )
                 yield {'type': 'final_answer', 'content': final}
                 elapsed = round(time.perf_counter() - t0, 2)
+                print(f'[stream]   ✓ final_answer at iter {iteration+1} ({elapsed}s, tools={tool_calls_count})', flush=True)
                 yield {
                     'type': 'done',
                     'iterations': iteration + 1,
@@ -1003,6 +1011,7 @@ async def run_agent_stream(
             )
 
         # --- max iter ---
+        print(f'[stream]   ⚠ max_iter_reached ({max_iter} iters used, tools={tool_calls_count})', flush=True)
         yield {'type': 'max_iter_reached'}
         elapsed = round(time.perf_counter() - t0, 2)
         yield {
