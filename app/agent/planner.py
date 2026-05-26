@@ -627,7 +627,7 @@ async def run_agent_stream(
     session_id: str,
     image_path: Optional[str | Path] = None,
     image_url_for_persist: Optional[str] = None,
-    max_iter: int = 5,
+    max_iter: int = 7,  # Qwen3 把 motivation+tool 切成两个 iter，所以比 4o-mini 的 5 多留 2 个
     user_id: Optional[int] = None,
 ) -> AsyncIterator[dict]:
     """SSE 事件流主实现。yield 事件 dict（外层负责序列化为 SSE）。
@@ -809,6 +809,15 @@ async def run_agent_stream(
         # gpt-4o-mini 偶尔会把同一事件存两次或把症状/情绪拆开重复存
         saved_event_keys: set[tuple] = set()
 
+        # Qwen3 天性是"先 content 后 tools 分两步"——iter N content="我先查 RAG" 没 tools 被 transition retry
+        # 捕获，iter N+1 才 emit tools 但 content="" 没东西展示。这里把 N 的失败 content 暂存，
+        # 在 N+1 真调 tools 时用作前端展示的 motivation，UX 看着就像 motivation+tool 一气呵成
+        pending_motivation: Optional[str] = None
+
+        # RAG 调用次数 cap（Qwen3 有时会重复 query 同主题 3-4 次浪费 iter，挤掉 final 的空间）
+        rag_call_count = 0
+        RAG_CAP = 2
+
         sid_short = session_id[:8] if session_id else '?'
         for iteration in range(max_iter):
             yield {'type': 'iter_start', 'iter': iteration + 1}
@@ -858,14 +867,15 @@ async def run_agent_stream(
                 # 不 yield + 不持久化——避免前端出现"重复 motivation"的尴尬 UX；
                 # 这次的 transition 是失败的尝试，对用户没意义，让下一轮 Qwen 带 tool_calls 重写即可
                 if _looks_like_transition_only(final) and iteration < max_iter - 1:
-                    print(f'[stream]   ⟲ silent transition retry (content looked like 光说不做)', flush=True)
+                    pending_motivation = final  # 暂存：下一轮真调 tool 时前端展示这句作 motivation
+                    print(f'[stream]   ⟲ silent transition retry, pending_motivation={final[:60]!r}', flush=True)
                     messages.append({
                         'role': 'system',
                         'content': (
                             '注意：你刚说要执行某个操作（如查知识库 / 记录事件），但**没有真的调 tool**。'
                             '请立即调用相应的 tool 真正执行——只说不做等于放弃任务。'
-                            '注意：你这条没带 tool_calls 的回复已被系统识别为失败尝试丢弃，'
-                            '请重新输出一条**带 tool_calls 的完整动作**（content 可以重写）。'
+                            '系统已把你这条 content 暂存当下一轮真调 tool 时的动作描述，'
+                            '你只需在下一轮 emit tool_calls 真调即可（content 可空、可重写）。'
                         ),
                     })
                     continue  # 静默进入下一轮 iter，让 LLM 真去调
@@ -892,9 +902,12 @@ async def run_agent_stream(
                 }
                 return
 
-            # 中间 assistant 有 content 也展示（thinking）
-            if msg.content:
-                yield {'type': 'assistant_thinking', 'content': msg.content}
+            # 中间 motivation 展示：Qwen3 经常 content="" 直接给 tools，
+            # 这时用 pending_motivation 兜底（上一轮被 transition retry 拒掉的"我先查 X"）
+            display_motivation = msg.content or pending_motivation or ''
+            if display_motivation:
+                yield {'type': 'assistant_thinking', 'content': display_motivation}
+            pending_motivation = None  # 用过就清——避免一个 motivation 串到下一个 tool 上
 
             # 执行 tool_calls
             tool_calls_for_audit = []
@@ -911,6 +924,39 @@ async def run_agent_stream(
                     'tool': tool_name,
                     'args': args,
                 }
+
+                # 工程兜底：retrieve_vet_knowledge cap 2 次/run
+                # Qwen3 有时同一主题刷 3-4 次 RAG，挤掉 final 的 iter 空间
+                if tool_name == 'retrieve_vet_knowledge':
+                    if rag_call_count >= RAG_CAP:
+                        result = {
+                            'ok': False,
+                            'skipped': True,
+                            'reason': f'本轮 RAG 已查过 {RAG_CAP} 次，资料足够。请基于已有结果直接写 final 给主人，不要再 emit retrieve_vet_knowledge。',
+                        }
+                        print(f'[stream]   ✗ RAG cap hit ({rag_call_count}/{RAG_CAP}), skipped', flush=True)
+                        tool_calls_count += 1
+                        truncated_result = _truncate_for_persist(result, 2000)
+                        tool_calls_for_audit.append({
+                            'tool': tool_name,
+                            'args': args,
+                            'result_summary': _summarize_result(result),
+                            'result': truncated_result,
+                        })
+                        yield {
+                            'type': 'tool_result',
+                            'iter': iteration + 1,
+                            'tool': tool_name,
+                            'summary': _summarize_result(result),
+                            'result': result,
+                        }
+                        messages.append({
+                            'role': 'tool',
+                            'tool_call_id': tc.id,
+                            'content': json.dumps(result, ensure_ascii=False),
+                        })
+                        continue
+                    rag_call_count += 1
 
                 # 工程兜底：save_pet_event 同 (pet_id, event_type) 重复调直接拒
                 # gpt-4o-mini 偶尔会把症状/情绪拆开存两次，或同事件重复
