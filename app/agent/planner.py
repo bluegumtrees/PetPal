@@ -486,7 +486,7 @@ _TRANSITION_HINTS = (
 
 
 def _looks_like_transition_only(text: str) -> bool:
-    """检测 LLM 输出是否是「过渡语但没调 tool」的半截子（光说不做）。
+    """检测 LLM 输出是否是「过渡语但没调 tool」的半截子（pre-action，光说不做）。
 
     特征：长度 < 150 字、含动作过渡词、没给出具体建议（无数字阈值/无结构化内容）。
     """
@@ -501,6 +501,28 @@ def _looks_like_transition_only(text: str) -> bool:
         or len(t) > 150
     )
     return not has_specifics
+
+
+# Qwen3 跑完 tool 后习惯写一句"我已经 X 了，来聊聊该怎么办" 这种 preamble，但不带详细 final。
+# 长度短逃过 transition 检测，直接当 final 提交 → 用户看到这句以为答完了。
+# 这类要"显示给用户当过渡话 + 让 LLM 补完整 final"，不是 silent 丢弃。
+_PREAMBLE_HINTS = (
+    # 完成感（说明动作已结束）
+    '已经为', '已经把', '已经记', '已经查', '已经存', '已经设',
+    '刚刚', '刚为', '刚记', '刚查', '刚存',
+    # 过渡到讨论
+    '来和你聊', '来跟你聊', '来聊聊', '来说说', '来分析',
+    '让我整理', '让我说', '让我聊', '让我分析',
+    '接下来', '现在来',
+)
+
+
+def _looks_like_preamble(text: str) -> bool:
+    """检测 post-tool preamble（"我刚做完 X，来聊聊"），不是完整 final。"""
+    t = (text or '').strip()
+    if len(t) < 1 or len(t) > 120:
+        return False
+    return any(w in t for w in _PREAMBLE_HINTS)
 
 
 def _summarize_tool_call_for_history(call: dict) -> str:
@@ -860,12 +882,39 @@ async def run_agent_stream(
                 ]
             messages.append(assistant_msg)
 
-            # 无 tool_call → 可能 final，也可能"光说不做"
+            # 无 tool_call → 可能 final，也可能"半截子"（pre-action 光说不做 / post-tool preamble）
             if not msg.tool_calls:
                 final = msg.content or ''
-                # 兜底：检测 LLM 光说不做（过渡语没真调 tool），静默注入 system 提示让它继续
-                # 不 yield + 不持久化——避免前端出现"重复 motivation"的尴尬 UX；
-                # 这次的 transition 是失败的尝试，对用户没意义，让下一轮 Qwen 带 tool_calls 重写即可
+
+                # 检测 1: post-tool preamble（"我刚做完 X，来聊聊该怎么办"）
+                # 这种是有意义的过渡话，应当显示给用户当 thinking，并让 LLM 补完整 final
+                # 放在 transition 检测之前——避免"让我整理"被当 pre-action 静默丢弃
+                if _looks_like_preamble(final) and iteration < max_iter - 1:
+                    print(f'[stream]   ↪ preamble retry, content={final[:60]!r}', flush=True)
+                    yield {'type': 'assistant_thinking', 'content': final}
+                    _persist_message(
+                        db,
+                        session_id=session_id,
+                        pet_id=pet_id,
+                        user_id=user_id,
+                        role='assistant',
+                        content=final,
+                        task=task,
+                        is_intermediate=True,
+                    )
+                    messages.append({
+                        'role': 'system',
+                        'content': (
+                            '你刚才写的是"已完成 X，来聊聊"这种过渡话，**不是完整答复**。'
+                            '请现在直接给出完整 final——分析 / 可能原因 / 建议 / 阈值（如就医 24h）/ 家庭处理步骤等，'
+                            '让主人看完就有可操作的信息。不要再写"来聊聊"这种开场白，直接给具体内容。'
+                        ),
+                    })
+                    continue  # 让 LLM 补完整 final
+
+                # 检测 2: pre-action transition（"我先查 RAG"但没真调）
+                # 静默 retry（不 yield + 不持久化）+ pending_motivation 暂存
+                # 让下一轮 LLM emit tool_calls 时，前端展示这句当动作描述
                 if _looks_like_transition_only(final) and iteration < max_iter - 1:
                     pending_motivation = final  # 暂存：下一轮真调 tool 时前端展示这句作 motivation
                     print(f'[stream]   ⟲ silent transition retry, pending_motivation={final[:60]!r}', flush=True)
