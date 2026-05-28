@@ -22,44 +22,53 @@ import { V4Btn, V4Card, Illo } from '../components/v4'
  * @typedef {Object} QuickPrompt
  * @property {string} label
  * @property {string} text       预填到输入框的文字
- * @property {string} hint       说明
- * @property {boolean} autoSend  true 直接发送；false 只填充输入框 + toast 提醒
- * @property {string} [reminder] autoSend=false 时的 toast 文案
+ * @property {string} hint       hint 文案（有 reminder 时前缀 📎 标记需要补内容）
+ * @property {string} [reminder] 点击后的 toast 提示（一般用于需要补图/改地址的场景）
  */
 
-/** @type {QuickPrompt[]} */
+/** @type {QuickPrompt[]}
+ *  6 卡 2×3 布局：
+ *    Row 1 健康咨询（文字 / 文字+图）：描述症状 | 评估体态
+ *    Row 2 VLM 多模态（强制需图）：解读情绪 | 评估疼痛
+ *    Row 3 实用工具：日程提醒 | 找医院
+ *  全部不 autoSend，点击都只填到输入框，按需修改后发送；含 reminder 的弹提示 */
 const QUICK_PROMPTS = [
+  // Row 1: 健康咨询
+  {
+    label: '🤒 描述症状',
+    text: '我家猫今天吐了 2 次，没什么精神',
+    hint: '文字 / 可附图',
+  },
   {
     label: '📸 评估体态',
     text: '看看它的体态评分怎么样',
     hint: '需上传侧身全身照',
-    autoSend: false,
-    reminder: '请上传一张猫/狗的侧身全身照再发送，BCS 评分需要看到肋骨/腰部',
+    reminder: '请上传一张猫/狗的侧身全身照再发送，BCS 评分需要看到肋骨/腰部轮廓',
+  },
+  // Row 2: VLM 多模态（强制需图）
+  {
+    label: '😺 解读情绪',
+    text: '看看它现在的情绪状态',
+    hint: '需上传照片',
+    reminder: '请上传一张能看清面部和姿态的照片，情绪靠 body signals 推断',
   },
   {
-    label: '🤒 描述症状',
-    text: '我家猫今天吐了 2 次，没什么精神',
-    hint: '文字咨询',
-    autoSend: true,
+    label: '🤕 评估疼痛',
+    text: '看看它是不是有疼痛迹象',
+    hint: '需上传猫脸照',
+    reminder: '请上传一张清晰猫脸照（耳/眼/口/胡须/头位），FGS 仅适用于猫',
   },
+  // Row 3: 实用工具
   {
-    label: '😺 情绪解读',
-    text: '它最近躲着我，是不是不开心？',
-    hint: '可附张照片更准',
-    autoSend: true,
-  },
-  {
-    label: '💉 疫苗提醒',
-    text: '帮我查下下次该打什么疫苗',
-    hint: '日程',
-    autoSend: true,
+    label: '🔔 日程提醒',
+    text: '帮我设个周三上午 9 点的疫苗提醒',
+    hint: '疫苗 / 驱虫 / 洗澡 等',
   },
   {
     label: '🏥 找医院',
-    text: '我在北京海淀，附近有什么宠物医院？',
+    text: '我在上海松江，附近有什么宠物医院？',
     hint: '把地址改成你所在城市',
-    autoSend: false,
-    reminder: '把示例里的「北京海淀」换成你所在城市/区再发送',
+    reminder: '把示例里的「上海松江」换成你所在城市/区再发送',
   },
 ]
 
@@ -349,18 +358,16 @@ export default function Chat() {
     [activePet, sessionId, toast]
   )
 
-  // 快速预设点击：autoSend=true 直接发；否则填充输入框 + toast 提醒
+  // 快速预设点击：统一填到输入框；含 reminder 的弹 toast 提示
   const handleQuickPick = useCallback(
     (p) => {
-      if (p.autoSend) {
-        handleSubmit({ text: p.text, image: null })
-      } else {
-        setInputDraft(p.text)
-        setInputDraftSeed((n) => n + 1)
-        toast(p.reminder || '请补充信息后发送', { kind: 'info', durationMs: 5000 })
+      setInputDraft(p.text)
+      setInputDraftSeed((n) => n + 1)
+      if (p.reminder) {
+        toast(p.reminder, { kind: 'info', durationMs: 5000 })
       }
     },
-    [handleSubmit, toast]
+    [toast]
   )
 
   // 空 / 无宠物 时
@@ -554,9 +561,9 @@ function EmptyHero({ onQuickPick }) {
             key={p.label}
             type="button"
             onClick={() => onQuickPick(p)}
-            className="text-left rounded-xl p-3 border transition group hover:shadow-md"
+            className="text-left rounded-xl p-3 border transition group hover:shadow-md backdrop-blur-sm"
             style={{
-              background: 'var(--v4-card)',
+              background: 'color-mix(in oklch, var(--v4-card) 65%, transparent)',
               borderColor: 'var(--v4-line)',
             }}
             onMouseEnter={(e) => {
@@ -573,13 +580,13 @@ function EmptyHero({ onQuickPick }) {
               {p.label}
             </p>
             <p className="text-xs mt-0.5" style={{ color: 'var(--v4-faint)' }}>
-              {p.autoSend ? p.hint : `📎 ${p.hint}`}
+              {p.reminder ? `📎 ${p.hint}` : p.hint}
             </p>
           </button>
         ))}
       </div>
       <p className="text-[10px] mt-4" style={{ color: 'var(--v4-faint)' }}>
-        含 📎 的预设点击后只填到输入框，需要你补图片或改地址后再发送
+        点击预设把示例填到输入框；含 📎 的需要补图片或修改后再发送
       </p>
     </div>
   )
