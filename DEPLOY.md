@@ -84,6 +84,9 @@ SMTP_PASS=
 SMTP_FROM=
 ALERT_TO=
 
+# JWT 签名密钥：生产必须设随机长串，可用 openssl rand -hex 32 生成
+PETPAL_JWT_SECRET=换成你生成的随机串
+
 APP_ENV=production
 PETPAL_DEV_MODE=0
 EOF
