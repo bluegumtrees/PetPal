@@ -41,6 +41,7 @@ FastAPI + StreamingResponse (SSE)  ── async generator + asyncio.to_thread
 - **临床量表 prompt 化** ⭐：FGS 的 5 个 Action Units（耳位 / 眼睑 / 口鼻 / 胡须 / 头位）× 0/1/2 评分编码为 VLM 输出 schema，输出 `total_score/10 + normalized` 并对照 0.39 临床阈值。
 - **多 task VLM**：症状 / 情绪 / 体态（WSAVA 9 分制）/ 疼痛 / 闲聊各有独立 prompt 与 Pydantic schema；情绪任务**不断言**，输出 `candidate_emotions + confidence` 并标注单图局限。
 - **三阶段检索 RAG**：稠密（BGE-small-zh + Chroma）+ 稀疏（BM25 + jieba）→ RRF 融合 → CrossEncoder 重排；知识库 257 条，带 `species / severity / emergency` 等 metadata 过滤。
+- **MCP 标准接入**：兽医知识库检索封装为标准 MCP server（`mcp_server.py`），Claude Code / Claude Desktop / Cursor 等任意 MCP 客户端可直接调用（附 stdio 冒烟测试）。
 - **多模态长期跟踪**：Recharts 时序对比图（BCS / 体重 / FGS），多次拍照看趋势；体重四入口（档案 / 编辑 / 称重 / LLM 口述）统一到单一数据源。
 - **日程提醒**：APScheduler（UTC 调度 + 启动恢复策略）+ per-user SMTP 邮件，支持疫苗 / 驱虫 / 洗澡 / 体检等。
 - **账号体系**：JWT 鉴权 + bcrypt，多用户数据隔离，多宠物切换 + 软删。
@@ -142,6 +143,32 @@ python -m eval.eval_agent         # Agent 端到端（多 case × 多 run）
 
 - **检索器**（32 query × 4 配置）：`hybrid + rerank` **hit@5 96.7% / hit@1 86.7%**；重排单独贡献 +27% hit@1。OOK（库外问题）top-1 相似度显著低于库内（0.347 vs 0.979），可作 agent 判断"无相关知识"的信号。
 - **Agent 端到端**（10 case × 3 run = 30）：经 6 轮"评测 → 诊断 → 修复"迭代，pass rate 从 40% → **96.7%**；中位延迟 ~14.7s（含 VLM + RAG + 多轮 tool）。
+
+## MCP Server
+
+`mcp_server.py` 把三阶段兽医检索封装为 [MCP（Model Context Protocol）](https://modelcontextprotocol.io) 标准工具——任何支持 MCP 的客户端（Claude Code / Claude Desktop / Cursor …）都能像用内置工具一样查询本知识库，无需了解 PetPal 内部实现：
+
+- `search_vet_knowledge(query, top_k, species, emergency_only)`：三阶段混合检索，支持物种 / 急诊过滤
+- `get_kb_overview()`：知识库规模与主题概况
+
+```bash
+pip install mcp                      # 仅本地工具链需要，不进生产镜像
+python scripts/mcp_smoke_test.py     # stdio 冒烟测试：initialize → list_tools → call_tool 全流程
+```
+
+Claude Code 一行接入（在仓库根目录、venv 激活状态下）：
+
+```bash
+claude mcp add petpal-vet -- python mcp_server.py
+```
+
+或在项目 `.mcp.json`：
+
+```json
+{ "mcpServers": { "petpal-vet": { "command": "python", "args": ["mcp_server.py"] } } }
+```
+
+> 实现细节：stdio 模式下 stdout 是 JSON-RPC 信道，检索器的模型加载日志已重定向到 stderr，避免污染协议。
 
 ## 部署
 

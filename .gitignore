@@ -37,3 +37,6 @@ desktop.ini
 
 # 个人笔记 / 私有文件（不公开）
 private/
+
+# 临时脚本输出
+scripts/_*
