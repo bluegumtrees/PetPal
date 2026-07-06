@@ -1,0 +1,2 @@
+# Keep GitHub language stats focused on the Python backend; web/ is the React UI
+web/** -linguist-detectable
