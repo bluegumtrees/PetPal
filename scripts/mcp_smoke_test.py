@@ -9,8 +9,12 @@ MCP server 冒烟测试：以 stdio 方式拉起 mcp_server.py，
 from __future__ import annotations
 
 import asyncio
+import faulthandler
 import sys
 from pathlib import Path
+
+# 卡死保险：120s 未完成则 dump 全部线程栈并退出，测试永不无限挂起
+faulthandler.dump_traceback_later(120, exit=True)
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client

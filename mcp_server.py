@@ -19,12 +19,25 @@ import sys
 
 from mcp.server.fastmcp import FastMCP
 
-from app.rag.retriever import get_retriever
-
 mcp = FastMCP('petpal-vet-kb')
 
-# stdio 模式下 stdout 是 JSON-RPC 信道，检索器的模型加载日志必须改道 stderr
+# stdio 模式下 stdout 是 JSON-RPC 信道，两条纪律（都是踩坑换来的）：
+# 1) 检索栈（numpy/torch/chromadb）必须在【启动时】即本行 import——曾改成
+#    工具首次调用时懒加载来加速握手，结果在 MCP 的 anyio+管道环境里，事件
+#    循环运行中做 C 扩展 import 触发 Windows 加载器死锁（py-spy 定位到
+#    numpy multiarray DLL 初始化），无论同步工具（工作线程）还是 async 工具
+#    （主线程）都会卡死。代价是启动约 10-30s，客户端需调大启动超时：
+#    Claude Code 设置环境变量 MCP_TIMEOUT=120000（毫秒）。
+# 2) 检索器的模型加载日志必须改道 stderr，不能污染协议。
 _to_stderr = lambda: contextlib.redirect_stdout(sys.stderr)  # noqa: E731
+
+with _to_stderr():
+    from app.rag.retriever import get_retriever
+
+
+def _retriever():
+    with _to_stderr():
+        return get_retriever()
 
 _SPECIES_WHERE = {'cat': 'species_cat', 'dog': 'species_dog'}
 
@@ -53,7 +66,7 @@ def search_vet_knowledge(
         where['emergency'] = True
 
     with _to_stderr():
-        results = get_retriever().search(query, top_k=top_k, where=where or None)
+        results = _retriever().search(query, top_k=top_k, where=where or None)
 
     if not results:
         return '知识库中未找到相关内容。'
@@ -79,9 +92,7 @@ def search_vet_knowledge(
 @mcp.tool()
 def get_kb_overview() -> str:
     """返回兽医知识库概况：条目总数、主题文件数、急诊条目数、物种覆盖。"""
-    with _to_stderr():
-        retriever = get_retriever()
-
+    retriever = _retriever()
     chunks = retriever._chunks  # 只读统计，直接用检索器已加载的 chunk 表
     files = sorted({c['file'] for c in chunks})
     n_emergency = sum(1 for c in chunks if c['meta'].get('emergency'))

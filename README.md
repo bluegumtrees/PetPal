@@ -168,7 +168,7 @@ claude mcp add petpal-vet -- python mcp_server.py
 { "mcpServers": { "petpal-vet": { "command": "python", "args": ["mcp_server.py"] } } }
 ```
 
-> 实现细节：stdio 模式下 stdout 是 JSON-RPC 信道，检索器的模型加载日志已重定向到 stderr，避免污染协议。
+> 实现细节两则（均为踩坑产物）：① stdio 模式下 stdout 是 JSON-RPC 信道，检索器的模型加载日志已重定向到 stderr；② 检索栈在**启动时**同步加载（约 10–30s）——曾尝试懒加载到首次调用来加速握手，但事件循环运行中做 C 扩展 import 会在 Windows 上触发加载器死锁（py-spy 定位到 numpy DLL 初始化）。因此 Claude Code 用户请调大启动超时：`setx MCP_TIMEOUT 120000`（一次设置永久生效），重开终端后连接。
 
 ## 部署
 
