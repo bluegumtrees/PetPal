@@ -362,6 +362,21 @@ def run_agent(
             # 没有 tool_call → 可能 final，也可能"光说不做"
             if not msg.tool_calls:
                 final = msg.content or ''
+                # 空白 final 兜底（stream 版检测 0 同款，避免 sync/stream 双轨漂移）
+                if not final.strip():
+                    if iteration < max_iter - 1:
+                        if verbose:
+                            print('[planner] empty final detected, injecting retry hint')
+                        messages.append({
+                            'role': 'system',
+                            'content': (
+                                '注意：你上一条输出是**空内容**，主人会看到一个空气泡。'
+                                '请立即基于已有的工具结果和上下文，直接写出完整 final 答复'
+                                '（结论 / 分析 / 建议 / 下一步），不要输出空内容。'
+                            ),
+                        })
+                        continue
+                    final = '⚠ 模型这次返回了空内容，没能生成完整回复。请换个问法再试一次。'
                 # P6.3 同款 transition retry（跟 stream 版本一致，避免 sync/stream 双轨漂移）
                 if _looks_like_transition_only(final) and iteration < max_iter - 1:
                     if verbose:
@@ -885,6 +900,22 @@ async def run_agent_stream(
             # 无 tool_call → 可能 final，也可能"半截子"（pre-action 光说不做 / post-tool preamble）
             if not msg.tool_calls:
                 final = msg.content or ''
+
+                # 检测 0: 空白 final（Qwen3 偶发在大块 tool 结果后返回纯空白；
+                # transition/preamble 检测都不匹配空串 → 曾被当正常 final 提交，主人看到空气泡）
+                if not final.strip():
+                    if iteration < max_iter - 1:
+                        print(f'[stream]   ∅ empty final, injecting retry hint', flush=True)
+                        messages.append({
+                            'role': 'system',
+                            'content': (
+                                '注意：你上一条输出是**空内容**，主人会看到一个空气泡。'
+                                '请立即基于已有的工具结果和上下文，直接写出完整 final 答复'
+                                '（结论 / 分析 / 建议 / 下一步），不要输出空内容。'
+                            ),
+                        })
+                        continue
+                    final = '⚠ 模型这次返回了空内容，没能生成完整回复。请换个问法再试一次。'
 
                 # 检测 1: post-tool preamble（"我刚做完 X，来聊聊该怎么办"）
                 # 这种是有意义的过渡话，应当显示给用户当 thinking，并让 LLM 补完整 final
