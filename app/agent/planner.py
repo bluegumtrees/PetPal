@@ -326,19 +326,26 @@ def run_agent(
         client = _get_client()
         model = os.getenv('LLM_MODEL', 'openai/gpt-4o-mini')
         tool_calls_log: list[dict] = []
+        empty_streak = 0
+        force_prose_next = False
 
         for iteration in range(max_iter):
             if verbose:
                 print(f'[planner] iter {iteration+1}/{max_iter}: calling LLM...')
 
-            resp = client.chat.completions.create(
+            llm_kwargs: dict = dict(
                 model=model,
                 messages=messages,
                 tools=TOOL_SCHEMAS,
                 temperature=0.5,
                 max_tokens=1500,
             )
+            if force_prose_next:
+                llm_kwargs['tool_choice'] = 'none'
+                force_prose_next = False
+            resp = client.chat.completions.create(**llm_kwargs)
             msg = resp.choices[0].message
+            _rescue_empty_content(msg)
 
             # 加入对话历史（保留 tool_calls 字段供下一轮用）
             assistant_msg: dict[str, Any] = {
@@ -364,17 +371,31 @@ def run_agent(
                 final = msg.content or ''
                 # 空白 final 兜底（stream 版检测 0 同款，避免 sync/stream 双轨漂移）
                 if not final.strip():
+                    empty_streak += 1
                     if iteration < max_iter - 1:
-                        if verbose:
-                            print('[planner] empty final detected, injecting retry hint')
-                        messages.append({
-                            'role': 'system',
-                            'content': (
-                                '注意：你上一条输出是**空内容**，主人会看到一个空气泡。'
-                                '请立即基于已有的工具结果和上下文，直接写出完整 final 答复'
-                                '（结论 / 分析 / 建议 / 下一步），不要输出空内容。'
-                            ),
-                        })
+                        if empty_streak >= 2:
+                            force_prose_next = True
+                            if verbose:
+                                print(f'[planner] empty final x{empty_streak}, forcing tool_choice=none')
+                            messages.append({
+                                'role': 'system',
+                                'content': (
+                                    '你又输出了空内容。下一轮已禁用全部工具，'
+                                    '请直接用纯文本写出完整 final 答复'
+                                    '（基于已有的工具结果和上下文：结论 / 建议 / 下一步）。'
+                                ),
+                            })
+                        else:
+                            if verbose:
+                                print('[planner] empty final detected, injecting retry hint')
+                            messages.append({
+                                'role': 'system',
+                                'content': (
+                                    '注意：你上一条输出是**空内容**，主人会看到一个空气泡。'
+                                    '请立即基于已有的工具结果和上下文，直接写出完整 final 答复'
+                                    '（结论 / 分析 / 建议 / 下一步），不要输出空内容。'
+                                ),
+                            })
                         continue
                     final = '⚠ 模型这次返回了空内容，没能生成完整回复。请换个问法再试一次。'
                 # P6.3 同款 transition retry（跟 stream 版本一致，避免 sync/stream 双轨漂移）
@@ -538,6 +559,23 @@ def _looks_like_preamble(text: str) -> bool:
     if len(t) < 1 or len(t) > 120:
         return False
     return any(w in t for w in _PREAMBLE_HINTS)
+
+
+def _rescue_empty_content(msg) -> None:
+    """content 空且无 tool_calls 时，尝试从 reasoning 字段捞回文本。
+
+    OpenRouter 上部分 Qwen provider 会把生成文本放进 message.reasoning /
+    reasoning_content 而 content 留空——前端表现为"空回复"。就地补回 content。
+    （openai SDK 的 message 模型 extra='allow'，未知字段可直接 getattr。）
+    """
+    if (msg.content or '').strip() or msg.tool_calls:
+        return
+    for field in ('reasoning', 'reasoning_content'):
+        text = getattr(msg, field, None)
+        if text and str(text).strip():
+            print(f'[planner] content empty, rescued from msg.{field} ({len(str(text))}ch)', flush=True)
+            msg.content = str(text).strip()
+            return
 
 
 def _summarize_tool_call_for_history(call: dict) -> str:
@@ -855,20 +893,30 @@ async def run_agent_stream(
         rag_call_count = 0
         RAG_CAP = 2
 
+        # 检测 0 升级：连续空输出计数 + 强制纯文本开关。
+        # 连续第 2 次空 → 下一轮 tool_choice='none'（假说：Qwen 想再调工具但格式吐坏，
+        # 既不是 content 也解析不出 tool_calls；光劝"写完整回复"救不回，禁工具逼它说话）
+        empty_streak = 0
+        force_prose_next = False
+
         sid_short = session_id[:8] if session_id else '?'
         for iteration in range(max_iter):
             yield {'type': 'iter_start', 'iter': iteration + 1}
             print(f'[stream] iter {iteration+1}/{max_iter} session={sid_short} task={task} → LLM...', flush=True)
 
             try:
+                llm_kwargs: dict[str, Any] = dict(
+                    model=model,
+                    messages=messages,
+                    tools=TOOL_SCHEMAS,
+                    temperature=0.5,
+                    max_tokens=1500,
+                )
+                if force_prose_next:
+                    llm_kwargs['tool_choice'] = 'none'
+                    force_prose_next = False
                 resp = await asyncio.to_thread(
-                    lambda: client.chat.completions.create(
-                        model=model,
-                        messages=messages,
-                        tools=TOOL_SCHEMAS,
-                        temperature=0.5,
-                        max_tokens=1500,
-                    )
+                    lambda: client.chat.completions.create(**llm_kwargs)
                 )
             except Exception as e:
                 print(f'[stream]   ✗ LLM call failed: {e}', flush=True)
@@ -876,6 +924,7 @@ async def run_agent_stream(
                 return
 
             msg = resp.choices[0].message
+            _rescue_empty_content(msg)
             _content_preview = (msg.content or '').replace('\n', ' ')[:100]
             _tools_preview = [tc.function.name for tc in msg.tool_calls] if msg.tool_calls else []
             print(f'[stream]   content={_content_preview!r} tools={_tools_preview}', flush=True)
@@ -904,16 +953,30 @@ async def run_agent_stream(
                 # 检测 0: 空白 final（Qwen3 偶发在大块 tool 结果后返回纯空白；
                 # transition/preamble 检测都不匹配空串 → 曾被当正常 final 提交，主人看到空气泡）
                 if not final.strip():
+                    empty_streak += 1
                     if iteration < max_iter - 1:
-                        print(f'[stream]   ∅ empty final, injecting retry hint', flush=True)
-                        messages.append({
-                            'role': 'system',
-                            'content': (
-                                '注意：你上一条输出是**空内容**，主人会看到一个空气泡。'
-                                '请立即基于已有的工具结果和上下文，直接写出完整 final 答复'
-                                '（结论 / 分析 / 建议 / 下一步），不要输出空内容。'
-                            ),
-                        })
+                        if empty_streak >= 2:
+                            # 连续空：劝没用，下一轮直接禁工具逼纯文本
+                            force_prose_next = True
+                            print(f'[stream]   ∅ empty final ×{empty_streak} → next iter tool_choice=none', flush=True)
+                            messages.append({
+                                'role': 'system',
+                                'content': (
+                                    '你又输出了空内容。下一轮已禁用全部工具，'
+                                    '请直接用纯文本写出完整 final 答复'
+                                    '（基于已有的工具结果和上下文：结论 / 建议 / 下一步）。'
+                                ),
+                            })
+                        else:
+                            print(f'[stream]   ∅ empty final, injecting retry hint', flush=True)
+                            messages.append({
+                                'role': 'system',
+                                'content': (
+                                    '注意：你上一条输出是**空内容**，主人会看到一个空气泡。'
+                                    '请立即基于已有的工具结果和上下文，直接写出完整 final 答复'
+                                    '（结论 / 分析 / 建议 / 下一步），不要输出空内容。'
+                                ),
+                            })
                         continue
                     final = '⚠ 模型这次返回了空内容，没能生成完整回复。请换个问法再试一次。'
 

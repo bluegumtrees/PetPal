@@ -555,27 +555,22 @@ function ThinkingCard({ stage, startedAt }) {
   const seconds = startedAt ? Math.max(0, Math.floor((now - startedAt) / 1000)) : 0
 
   return (
-    <div
-      className="flex items-center gap-3 rounded-xl border px-4 py-3 mb-3 max-w-md"
-      style={{ background: 'var(--v4-card)', borderColor: 'var(--v4-line)' }}
-    >
+    <div className="flex items-center gap-2.5 px-1 py-1 mb-2">
       <span className="flex items-end gap-1" aria-hidden="true">
         {[0, 1, 2].map((i) => (
           <span
             key={i}
-            className="inline-block w-2 h-2 rounded-full animate-bounce motion-reduce:animate-none"
+            className="inline-block w-1.5 h-1.5 rounded-full animate-bounce motion-reduce:animate-none"
             style={{ background: 'var(--v4-accent)', animationDelay: `${i * 0.15}s` }}
           />
         ))}
       </span>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm truncate" style={{ color: 'var(--v4-ink)' }}>
-          {stage || '思考中…'}
-        </p>
-        <p className="text-[11px] mt-0.5" style={{ color: 'var(--v4-faint)' }}>
-          已思考 {seconds} 秒 · 多轮工具编排通常需要 20-60 秒
-        </p>
-      </div>
+      <p className="text-xs truncate min-w-0" style={{ color: 'var(--v4-mute)' }}>
+        {stage || '思考中…'}
+        <span style={{ color: 'var(--v4-faint)' }}>
+          {' · '}{seconds}s{seconds > 8 && '（多轮工具编排一般 20-60s）'}
+        </span>
+      </p>
     </div>
   )
 }
