@@ -11,9 +11,12 @@
 | `manifest.yaml` | 内容剧本（人读的设计文档：故事线 / 时间轴 / 录制脚本） |
 | `assets/` | 14 张照片（Pixabay 内容许可 + 1 张自有），来源见 `SOURCES.md` |
 
-会话内容为真实 agent 录制（工具调用、RAG 结果、VLM 输出均为真），仅对
-`bundle.json` 中 S5 的一处时间指代和一处中英混杂做了两行后期修正
-（原始版本保留在 `conversations.json`）。
+会话内容为真实 agent 录制（工具调用、RAG 结果、VLM 输出均为真）。对
+`bundle.json` 的后期修正共两类（原始导出保留在 `conversations.json`）：
+S5 的一处时间指代 + 一处中英混杂（两行文字）；以及按录制日志逐字回填了
+5 句动机语（S5×3、D4×2）——它们在录制时经 pending_motivation 补帧展示过，
+但当时的持久化 bug 没把这类帧写库（bug 已修：planner 现在持久化
+display_motivation）。
 
 ## 一键重置（面试 / 发简历前跑一遍）
 

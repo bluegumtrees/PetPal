@@ -1503,7 +1503,7 @@
      "session_id": "3f5d42a4-0bfd-4d09-a38f-9db6d031356b",
      "pet_id": 23,
      "role": "assistant",
-     "content": "",
+     "content": "我先查一下兽医知识库，看看换粮后呕吐的可能原因和处理建议 📚",
      "tool_calls": [
       {
        "tool": "retrieve_vet_knowledge",
@@ -1580,7 +1580,7 @@
      "session_id": "3f5d42a4-0bfd-4d09-a38f-9db6d031356b",
      "pet_id": 23,
      "role": "assistant",
-     "content": "",
+     "content": "我先为蛋蛋记录这次的症状情况，再给你具体建议 🐾",
      "tool_calls": [
       {
        "tool": "save_pet_event",
@@ -1656,7 +1656,7 @@
      "session_id": "3f5d42a4-0bfd-4d09-a38f-9db6d031356b",
      "pet_id": 23,
      "role": "assistant",
-     "content": "",
+     "content": "我来把呕吐物的细节补充到蛋蛋的记录里，方便追踪情况 📝",
      "tool_calls": [
       {
        "tool": "update_pet_event",
@@ -2525,7 +2525,7 @@
      "session_id": "3becb8ae-847f-4133-80d1-78379097b06f",
      "pet_id": 24,
      "role": "assistant",
-     "content": "",
+     "content": "我来更新点点的体重记录 📏",
      "tool_calls": [
       {
        "tool": "save_pet_event",
@@ -2583,7 +2583,7 @@
      "session_id": "3becb8ae-847f-4133-80d1-78379097b06f",
      "pet_id": 24,
      "role": "assistant",
-     "content": "",
+     "content": "我先查一下点点这半年的体重记录 📚",
      "tool_calls": [
       {
        "tool": "query_pet_history",
