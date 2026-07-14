@@ -103,10 +103,15 @@ def main() -> None:
             avatar_dir = UPLOADS / 'pets' / str(p['id'])
             avatar_dir.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(ASSETS / p['avatar_asset'], avatar_dir / 'avatar_seed.jpg')
+            # created_at 回溯到最早事件前一个月——否则档案页"创建于今天"
+            # 会和"到家两周年"这类叙事穿帮
+            first_day = min(e['day'] for e in bundle['events'] if e['pet_id'] == p['id'])
+            created = anchor_dt(first_day - 30, '10:00')
             pet = Pet(id=p['id'], user_id=demo.id, name=p['name'], species=p['species'],
                       breed=p['breed'], gender=p['gender'], neutered=p['neutered'],
                       birthday=birthday, weight_kg=p['weight_kg'],
-                      photo_url=f"/static/pets/{p['id']}/avatar_seed.jpg")
+                      photo_url=f"/static/pets/{p['id']}/avatar_seed.jpg",
+                      created_at=created, updated_at=created)
             s.add(pet)
             print(f"[pet] {p['name']} id={p['id']}")
         s.commit()
