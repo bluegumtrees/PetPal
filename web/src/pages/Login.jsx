@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { V4Btn, V4Card, Illo } from '../components/v4'
@@ -8,11 +8,22 @@ export default function Login() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const from = params.get('from') || '/'
+  // /login?demo=1 → 自动一键登录（简历二维码直达 demo 账号，省一次点击）
+  const autoDemo = params.get('demo') === '1'
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+
+  const autoDemoFired = useRef(false)
+  useEffect(() => {
+    if (autoDemo && !autoDemoFired.current) {
+      autoDemoFired.current = true // StrictMode 双跑 / 重渲染防重复触发
+      handleDemo()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoDemo])
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -141,7 +152,7 @@ export default function Login() {
           className="w-full"
           icon="sparkle"
         >
-          🎈 一键试用 demo 账号
+          {autoDemo && submitting ? '正在进入演示账号…' : '🎈 一键试用 demo 账号'}
         </V4Btn>
 
         <p className="text-center text-xs mt-5" style={{ color: 'var(--v4-mute)' }}>

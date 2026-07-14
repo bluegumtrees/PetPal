@@ -89,6 +89,9 @@ export default function Chat() {
   const [blocks, setBlocks] = useState([])
   const [historyLoading, setHistoryLoading] = useState(false)
   const [isStreaming, setIsStreaming] = useState(false)
+  // 等待态：阶段文案跟着 SSE 事件走 + 计时（首 token 前 10-20s 不再是干等）
+  const [streamStage, setStreamStage] = useState('')
+  const [streamStartAt, setStreamStartAt] = useState(0)
   const abortRef = useRef(null)
   const scrollRef = useRef(null)
 
@@ -240,6 +243,9 @@ export default function Chat() {
       ])
 
       setIsStreaming(true)
+      setStreamStage('正在识别任务类型…')
+      setStreamStartAt(Date.now())
+      const hasImage = !!image
       const ctrl = new AbortController()
       abortRef.current = ctrl
 
@@ -253,6 +259,7 @@ export default function Chat() {
             const t = ev.type
 
             if (t === 'task_classified') {
+              setStreamStage(hasImage ? '正在用 VLM 分析图片…' : '正在读取档案与近况，规划下一步…')
               setBlocks((b) => {
                 // 给刚才的 user block 补 task 字段
                 const next = b.map((x) =>
@@ -264,6 +271,7 @@ export default function Chat() {
                 return next
               })
             } else if (t === 'vlm_done') {
+              setStreamStage('图片分析完成，agent 决策中…')
               setBlocks((b) => {
                 const next = b.map((x) =>
                   x.id === userBlockId
@@ -288,6 +296,7 @@ export default function Chat() {
                 )
               })
             } else if (t === 'tool_call') {
+              setStreamStage('正在执行工具…')
               const key = `${ev.iter}-${ev.tool}-${Date.now()}`
               runningToolIds[ev.tool + '-' + ev.iter] = key
               setBlocks((b) => [
@@ -305,6 +314,7 @@ export default function Chat() {
                 },
               ])
             } else if (t === 'tool_result') {
+              setStreamStage('整理工具结果，继续推理…')
               const key = runningToolIds[ev.tool + '-' + ev.iter]
               // duplicate / skipped / cached 视觉噪声——直接从 UI 移除（数据已审计在 db）
               const isNoise = ev.result?.duplicate === true || ev.result?.skipped === true || ev.result?.cached === true
@@ -328,6 +338,7 @@ export default function Chat() {
                 )
               }
             } else if (t === 'assistant_thinking') {
+              setStreamStage('agent 思考中…')
               setBlocks((b) => [
                 ...b,
                 { id: 'th-' + Date.now(), kind: 'thinking', data: { content: ev.content } },
@@ -511,15 +522,7 @@ export default function Chat() {
           return null
         })}
 
-        {isStreaming && (
-          <div className="text-xs text-center py-1" style={{ color: 'var(--v4-faint)' }}>
-            <span
-              className="inline-block w-1.5 h-1.5 rounded-full animate-pulse mr-1"
-              style={{ background: 'var(--v4-accent)' }}
-            />
-            思考中…
-          </div>
-        )}
+        {isStreaming && <ThinkingCard stage={streamStage} startedAt={streamStartAt} />}
         {/* anchor for auto-scroll-to-bottom (window-level scroll) */}
         <div ref={scrollRef} />
       </div>
@@ -534,6 +537,44 @@ export default function Chat() {
           isStreaming={isStreaming}
           onCancel={handleCancel}
         />
+      </div>
+    </div>
+  )
+}
+
+/** 流式等待卡：阶段文案 + 已思考秒数。
+ *  Qwen3 + RAG 首 token 前常有 10-20s，静默等待像卡死；
+ *  这里把过程透明化（路由 → VLM → 工具 → 推理），演示时也有话可讲。
+ *  @param {{ stage: string, startedAt: number }} props */
+function ThinkingCard({ stage, startedAt }) {
+  const [now, setNow] = useState(Date.now())
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [])
+  const seconds = startedAt ? Math.max(0, Math.floor((now - startedAt) / 1000)) : 0
+
+  return (
+    <div
+      className="flex items-center gap-3 rounded-xl border px-4 py-3 mb-3 max-w-md"
+      style={{ background: 'var(--v4-card)', borderColor: 'var(--v4-line)' }}
+    >
+      <span className="flex items-end gap-1" aria-hidden="true">
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            className="inline-block w-2 h-2 rounded-full animate-bounce motion-reduce:animate-none"
+            style={{ background: 'var(--v4-accent)', animationDelay: `${i * 0.15}s` }}
+          />
+        ))}
+      </span>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm truncate" style={{ color: 'var(--v4-ink)' }}>
+          {stage || '思考中…'}
+        </p>
+        <p className="text-[11px] mt-0.5" style={{ color: 'var(--v4-faint)' }}>
+          已思考 {seconds} 秒 · 多轮工具编排通常需要 20-60 秒
+        </p>
       </div>
     </div>
   )
