@@ -1187,13 +1187,15 @@ async def run_agent_stream(
                 })
 
             # 把这一轮（中间 thinking + tool 调用）持久化
+            # content 存 display_motivation 而非 msg.content：pending_motivation 补帧的
+            # 动机语（模型上一轮说的话）也入库，刷新后历史还原才和直播流一致
             _persist_message(
                 db,
                 session_id=session_id,
                 pet_id=pet_id,
                 user_id=user_id,
                 role='assistant',
-                content=msg.content or '',
+                content=display_motivation or '',
                 tool_calls_json=json.dumps(tool_calls_for_audit, ensure_ascii=False),
                 task=task,
                 is_intermediate=True,  # 这一轮不是 final answer
