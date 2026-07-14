@@ -613,11 +613,12 @@
    "time": "08:59",
    "type": "note",
    "payload": {
-    "summary": "weight_trend_analysis",
+    "summary": "半年从 35.2kg 减到 30.5kg（-4.7kg），达成医生建议的减重目标",
     "start_weight": 35.2,
     "current_weight": 30.5,
     "total_loss": 4.7,
-    "duration_days": 150
+    "duration_days": 150,
+    "title": "减肥成果小结"
    },
    "note": "主人请求总结半年减肥成果，已生成进展报告",
    "image_asset": null,
