@@ -37,20 +37,26 @@ function fmtRelativeFuture(iso) {
 const EVENT_ICON = {
   bcs: 'scale', weight: 'scale', symptom: 'drop', emotion: 'heart',
   pain_fgs: 'sparkle', vaccine: 'syringe', grooming: 'bath',
-  milestone: 'crown', note: 'leaf', feeding: 'fish',
+  milestone: 'crown', note: 'leaf', feeding: 'fish', photo: 'camera',
 }
 
 function eventTitle(e) {
+  // LLM 存事件时 payload 字段名不稳定，逐级兜底；最后落到事件 note 列
   switch (e.event_type) {
-    case 'symptom': return e.payload?.symptom_desc || '症状'
+    case 'symptom': return e.payload?.symptom_desc || e.note || '症状'
     case 'bcs': return `BCS ${e.payload?.bcs_score ?? '?'}`
     case 'weight': return `${e.payload?.weight_kg ?? '?'} kg`
-    case 'emotion': return e.payload?.main_emotion || '情绪'
+    case 'emotion': return e.payload?.main_emotion || e.note || '情绪'
     case 'pain_fgs': return `FGS ${e.payload?.total_score}/10`
-    case 'vaccine': return e.payload?.vaccine_name || '疫苗'
-    case 'milestone': return e.payload?.title || '里程碑'
-    case 'note': return e.payload?.text || '备忘'
-    default: return e.event_type
+    case 'vaccine': return e.payload?.vaccine_name || e.payload?.name || e.note || '疫苗'
+    case 'milestone': return e.payload?.title || e.note || '里程碑'
+    case 'note':
+      return e.payload?.text || e.payload?.title || e.payload?.description
+        || e.payload?.summary || e.note || '备忘'
+    case 'feeding': return e.payload?.description || e.note || '饮食记录'
+    case 'grooming': return e.payload?.description || e.note || '洗护'
+    case 'photo': return e.note || '拍了张照片'
+    default: return e.note || e.event_type
   }
 }
 
@@ -85,6 +91,8 @@ export default function PetStatusPanel({ onClose, onNavigate, compact = false })
   const { activePet } = usePets()
   const [events, setEvents] = useState([])
   const [reminders, setReminders] = useState([])
+  const [bcsPoint, setBcsPoint] = useState(null)
+  const [emotionEvent, setEmotionEvent] = useState(null)
   const [loading, setLoading] = useState(true)
   // 本地"打勾"标记（视觉级，未真存——勾后视觉灰掉，下次加载恢复）
   const [checkedIds, setCheckedIds] = useState(() => new Set())
@@ -93,12 +101,19 @@ export default function PetStatusPanel({ onClose, onNavigate, compact = false })
     if (!activePet) return
     setLoading(true)
     try {
-      const [evs, rems] = await Promise.all([
+      // 体态读 BCS 趋势的最后一个点（含 VLM 评估，权威源）；
+      // 心情单独取最新 emotion 事件——两者都可能不在"最近 10 条"窗口里
+      const [evs, rems, bcsTl, emoEvs] = await Promise.all([
         api(`/api/events?pet_id=${activePet.id}&limit=10`),
         api(`/api/reminders?pet_id=${activePet.id}`),
+        api(`/api/events/timeline?pet_id=${activePet.id}&metric=bcs`).catch(() => null),
+        api(`/api/events?pet_id=${activePet.id}&event_type=emotion&limit=1`).catch(() => null),
       ])
       setEvents(evs || [])
       setReminders(rems || [])
+      const pts = bcsTl?.points
+      setBcsPoint(pts && pts.length > 0 ? pts[pts.length - 1] : null)
+      setEmotionEvent(emoEvs && emoEvs.length > 0 ? emoEvs[0] : null)
     } catch {
       // 静默
     } finally {
@@ -150,9 +165,12 @@ export default function PetStatusPanel({ onClose, onNavigate, compact = false })
     )
   }
 
-  const latestBcs = events.find((e) => e.event_type === 'bcs')
-  const latestEmotion = events.find((e) => e.event_type === 'emotion')
+  // 趋势点优先（含 VLM 评估），事件窗口内的 bcs 作兜底
+  const bcsScore = bcsPoint?.value ?? events.find((e) => e.event_type === 'bcs')?.payload?.bcs_score ?? null
+  const latestEmotion = emotionEvent || events.find((e) => e.event_type === 'emotion')
   const pending = reminders.filter((r) => !r.notified).slice(0, 3)
+  // 已触发的提醒不凭空消失——灰色打勾态保留最近 2 条
+  const done = reminders.filter((r) => r.notified).slice(0, 2)
   const recent = events.slice(0, 5)
   const age = fmtAge(activePet.birthday)
 
@@ -207,8 +225,8 @@ export default function PetStatusPanel({ onClose, onNavigate, compact = false })
             tone="second"
             label="体态"
             iconName="leaf"
-            value={latestBcs?.payload?.bcs_score ?? '—'}
-            sub={latestBcs?.payload?.bcs_score ? '/ 9' : '未评估'}
+            value={bcsScore ?? '—'}
+            sub={bcsScore != null ? '/ 9' : '未评估'}
           />
           <StatCard
             tone="accent"
@@ -241,7 +259,7 @@ export default function PetStatusPanel({ onClose, onNavigate, compact = false })
         </Link>
 
         {/* 要做的事（白底大卡 + checkbox 打勾）*/}
-        {(pending.length > 0 || loading) && (
+        {(pending.length > 0 || done.length > 0 || loading) && (
           <div>
             <div
               className="text-[10px] uppercase tracking-wider font-semibold mb-1.5 inline-flex items-center gap-1 px-1"
@@ -294,6 +312,42 @@ export default function PetStatusPanel({ onClose, onNavigate, compact = false })
                   </label>
                 )
               })}
+              {/* 已触发的提醒：灰色打勾态保留，不凭空消失 */}
+              {done.map((r) => (
+                <div
+                  key={'done-' + r.id}
+                  className="flex items-center gap-2.5 px-2 py-2 rounded-lg"
+                  style={{
+                    borderTop: pending.length > 0 ? '1px solid var(--v4-line)' : 'none',
+                    opacity: 0.55,
+                  }}
+                >
+                  <span
+                    className="inline-flex items-center justify-center w-7 h-7 rounded-full shrink-0"
+                    style={{ background: 'var(--v4-tint)' }}
+                  >
+                    <Illo name="bell" size={12} color="var(--v4-mute)" />
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div
+                      className="text-[13px] font-medium truncate line-through"
+                      style={{ color: 'var(--v4-mute)' }}
+                    >
+                      {r.message || r.reminder_type}
+                    </div>
+                    <div className="text-[10px]" style={{ color: 'var(--v4-faint)' }}>
+                      已提醒 · {fmtRelativeFuture(r.scheduled_at)}
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked
+                    readOnly
+                    className="w-4 h-4 rounded shrink-0"
+                    style={{ accentColor: 'var(--v4-mute)' }}
+                  />
+                </div>
+              ))}
             </div>
           </div>
         )}
