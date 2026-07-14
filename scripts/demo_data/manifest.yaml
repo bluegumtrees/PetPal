@@ -1,0 +1,248 @@
+# =============================================================
+# PetPal 黄金演示账号 manifest —— 单一事实来源
+# =============================================================
+# 设计目标（2026-07 重建）：
+#   1. 简历二维码场景：HR 登录后 60 秒内看到的都是干净、有故事的内容
+#   2. 面试现场场景：趋势图 / 历史会话 / 现场提问三板斧指哪打哪
+#   3. 「账号持续在用」观感：所有时间戳为相对天数（day: -98 = 运行日前 98 天），
+#      每次跑 seed_demo.py 整条历史自动滑动到「昨天刚用过」
+#
+# 两条故事线：
+#   蛋蛋（暹罗猫，主角）—— 绝育术后 FGS 疼痛跟踪（3 次评估康复曲线）
+#                          + 换粮呕吐风波（多轮会话 + 事件追加更新）
+#   点点（金毛犬，配角）—— 半年体重管理 35.2 → 30.5 kg（10 点下降曲线）
+#                          + 误食巧克力急救（RAG 红线 + 附近急诊）
+#
+# 数据机制备忘（不能改错地方）：
+#   - BCS / FGS 趋势图数据点 = chat_sessions 里带 vlm_output_json 的 user 消息
+#     （由「录制会话」产生，seed 按本文件 day 回溯 created_at）
+#   - weight 趋势图数据点 = pet_events(event_type=weight).happened_at
+#   - 会话产生的事件（症状/评分/里程碑）由 agent 录制时自行 save，
+#     seed 把它们的 happened_at 对齐到所属会话的 day
+# =============================================================
+
+meta:
+  demo_email: demo@petpal.local
+  # 录制/兜底安排见 conversations 段；events 段是脚本直插的结构化数据
+
+pets:
+  dandan:
+    name: 蛋蛋
+    species: cat
+    breed: 暹罗
+    gender: male
+    neutered: true
+    birthday_days_ago: 855        # ≈ 2 岁 4 个月
+    avatar: cat_body_table.jpg
+    weight_kg: from_last_weight_event
+  diandian:
+    name: 点点
+    species: dog
+    breed: 金毛
+    gender: female
+    neutered: true
+    birthday_days_ago: 1760       # ≈ 4 岁 10 个月
+    avatar: dog_avatar_lake.jpg
+    weight_kg: from_last_weight_event
+
+# -------------------------------------------------------------
+# 事件时间线（脚本直插；会话自产事件不在此列）
+# weight 的 previous/delta 由 seed 按序自动补
+# -------------------------------------------------------------
+events:
+  dandan:
+    - {day: -168, time: "10:20", type: milestone, payload: {title: 蛋蛋到家两周年, description: 从巴掌大的小不点长成 4 公斤的大男孩}, note: null}
+    - {day: -160, time: "21:30", type: weight, payload: {weight_kg: 4.05}, note: 月度例行称重}
+    - {day: -152, time: "11:05", type: vaccine, payload: {vaccine_name: 猫三联年检（FVRCP）, brand: 妙三多}, note: 医生说状态很好，明年这个时候再来}
+    - {day: -140, time: "19:40", type: grooming, payload: {description: 洗澡 + 剪指甲}, note: 洗完炸毛半小时，录了个视频}
+    - {day: -135, time: "21:10", type: weight, payload: {weight_kg: 4.10}}
+    - {day: -120, time: "14:30", type: photo, payload: {}, note: 窗台老位置晒太阳，午后固定机位, image: cat_emotion_doze.jpg}
+    - {day: -110, time: "21:00", type: weight, payload: {weight_kg: 4.18}}
+    - {day: -101, time: "18:20", type: note, payload: {text: 预约了周四的绝育手术，术前体检和血检都通过了}}
+    - {day: -98, time: "16:00", type: milestone, payload: {title: 绝育手术顺利完成, description: 麻醉恢复正常，医生嘱咐戴一周伊丽莎白圈，观察伤口}}
+    # day -98 / -95 / -91：FGS 三连评估由会话 S1-S3 产生（见 conversations）
+    - {day: -91, time: "11:30", type: note, payload: {text: 拆线复查：伤口愈合良好，可以摘圈了}}
+    - {day: -85, time: "21:20", type: weight, payload: {weight_kg: 4.22}}
+    - {day: -76, time: "08:40", type: feeding, payload: {description: 恢复正常粮量，早晚各一顿，加餐冻干}, note: 术后食欲完全恢复}
+    - {day: -70, time: "20:00", type: note, payload: {text: 体内外驱虫（大宠爱 + 海乐妙），下次 8 月底}}
+    - {day: -60, time: "21:15", type: weight, payload: {weight_kg: 4.25}}
+    - {day: -45, time: "19:30", type: grooming, payload: {description: 洗澡}, note: 这次全程没叫，进步了}
+    - {day: -40, time: "21:05", type: weight, payload: {weight_kg: 4.28}}
+    - {day: -26, time: "09:10", type: feeding, payload: {description: 开始换新粮（试吃装），与原粮 3:7 过渡}, note: 卖家说要一周过渡期}
+    # day -24：呕吐多轮会话 S5（agent 自行 save symptom + 追加更新）
+    - {day: -23, time: "12:00", type: note, payload: {text: 禁食半天后没再吐，喂了益生菌，晚上吃了小半顿}}
+    - {day: -21, time: "10:30", type: note, payload: {text: 彻底停掉新粮换回原粮，呕吐没再出现}}
+    - {day: -19, time: "22:00", type: note, payload: {text: 精神食欲完全恢复，又开始半夜跑酷了}}
+    - {day: -20, time: "21:00", type: weight, payload: {weight_kg: 4.32}}
+    # day -14：BCS 会话 S6；day -10：情绪会话 S7
+    - {day: -8,  time: "23:10", type: milestone, payload: {title: 学会开抽屉了, description: 自己扒开零食抽屉叼走冻干，被监控拍个正着}}
+    - {day: -6,  time: "21:25", type: weight, payload: {weight_kg: 4.30}}
+    - {day: -1,  time: "18:50", type: photo, payload: {}, note: 楼下遛弯，昂首挺胸巡视领地, image: cat_outdoor_profile.jpg}
+
+  diandian:
+    - {day: -155, time: "15:40", type: note, payload: {text: 年度体检：35.2kg 明显超重（BCS 7/9），医生建议减重到 31kg 以内}}
+    - {day: -155, time: "15:45", type: bcs, payload: {bcs_score: 7, rationale: 体检结论——腰线消失，肋骨需用力才能摸到}, note: 减肥计划起点，手动补录}
+    - {day: -154, time: "08:30", type: feeding, payload: {description: 换处方减重粮，定量早晚两顿；每天加 40 分钟快走}, note: 减肥计划 Day 1}
+    - {day: -150, time: "20:10", type: weight, payload: {weight_kg: 35.2}, note: 减肥计划基线}
+    - {day: -135, time: "20:00", type: weight, payload: {weight_kg: 34.6}}
+    - {day: -120, time: "20:05", type: weight, payload: {weight_kg: 34.0}}
+    - {day: -105, time: "20:10", type: weight, payload: {weight_kg: 33.3}}
+    - {day: -100, time: "10:00", type: milestone, payload: {title: 来家四周年, description: 四年前也是这样的夏天把她抱回家的}, image: dog_puppy_grass.jpg}
+    - {day: -90,  time: "20:00", type: weight, payload: {weight_kg: 32.8}}
+    - {day: -75,  time: "20:15", type: weight, payload: {weight_kg: 32.1}}
+    - {day: -75,  time: "08:45", type: feeding, payload: {description: 减重粮适应良好，加一勺南瓜泥拌食防便秘}}
+    # day -64：巧克力急救会话 D1（agent 自行 save symptom）
+    - {day: -63, time: "10:20", type: note, payload: {text: 催吐处理及时，医生评估 50g 黑巧对 32kg 体重风险中低，观察 24 小时无异常}}
+    - {day: -60, time: "20:05", type: weight, payload: {weight_kg: 31.6}}
+    - {day: -50, time: "16:30", type: grooming, payload: {description: 洗澡 + 梳毛}, note: 掉毛季，梳出一只小狗的量}
+    - {day: -45, time: "20:00", type: weight, payload: {weight_kg: 31.2}}
+    - {day: -35, time: "17:20", type: photo, payload: {}, note: 公园长凳趴着看鸭子，一动不动看了二十分钟, image: dog_portrait_rest.jpg}
+    - {day: -25, time: "20:10", type: weight, payload: {weight_kg: 30.8}}
+    # day -20：BCS 会话 D2；day -12：游泳里程碑会话 D3
+    # day -5：称重+减肥总结会话 D4（agent save weight 30.5 → 趋势图第 10 个点）
+
+# -------------------------------------------------------------
+# 提醒（seed 直插；S8 会话现场创建的疫苗提醒由 seed 对齐/去重）
+# notified=true 的两条用于展示「已触发 + dry-run 邮件预览」功能
+# -------------------------------------------------------------
+reminders:
+  dandan:
+    - {day: -70, time: "20:00", type: deworm, message: 给蛋蛋做体内外驱虫, notified: true}
+    - {day: -45, time: "19:00", type: bath, message: 给蛋蛋洗澡, notified: true}
+    - {day: +6,  time: "19:00", type: bath, message: 给蛋蛋洗澡（上次已隔 7 周）, notified: false}
+    - {day: +18, time: "20:00", type: deworm, message: 蛋蛋体内外驱虫（大宠爱 + 海乐妙）, notified: false}
+    - {day: +11, time: "10:00", type: vaccine, message: 带蛋蛋做年度疫苗体检（S8 会话创建，seed 对齐）, notified: false, repeat_rule: yearly, from_session: S8}
+  diandian:
+    - {day: -50, time: "15:00", type: bath, message: 给点点洗澡梳毛, notified: true}
+    - {day: +5,  time: "16:00", type: bath, message: 给点点洗澡（游泳后皮肤检查）, notified: false}
+    - {day: +14, time: "09:00", type: medication, message: 点点心丝虫预防药（犬心保）, notified: false, repeat_rule: monthly}
+
+# -------------------------------------------------------------
+# 会话录制剧本（真跑 agent，每条挑最好的一次 take）
+# 质检标准：无 skipped/duplicate 卡片、RAG 相关度高、final 完整、
+#           agent 至少 save 了预期事件、无空回复
+# -------------------------------------------------------------
+conversations:
+  # ---- 蛋蛋（8 条）----
+  - id: S1
+    pet: dandan
+    day: -98
+    time: "20:30"
+    task_hint: pain_fgs
+    turns:
+      - {text: 蛋蛋今天做完绝育手术回家，一直趴着不动，是不是很疼？, image: cat_fgs_day1_sleep.jpg}
+    expect: [vlm_pain_fgs, save_pet_event]
+    note: FGS 康复曲线起点；分数以真实 VLM 输出为准（预期中高位）
+
+  - id: S2
+    pet: dandan
+    day: -95
+    time: "19:10"
+    task_hint: pain_fgs
+    turns:
+      - {text: 术后第三天，还是有点蔫，帮我再评估一次疼痛, image: cat_fgs_day3_squint.jpg}
+    expect: [vlm_pain_fgs]
+    note: 曲线中点（预期中低位）
+
+  - id: S3
+    pet: dandan
+    day: -91
+    time: "09:40"
+    task_hint: pain_fgs
+    turns:
+      - {text: 今天拆线回来啦，精神好多了，再看看还疼不疼, image: cat_fgs_day7_alert.jpg}
+    expect: [vlm_pain_fgs]
+    note: 曲线终点（预期 0-1，对照 0.39 阈值收尾）
+
+  - id: S4
+    pet: dandan
+    day: -55
+    time: "15:20"
+    task_hint: bcs
+    turns:
+      - {text: 好久没体检了，帮蛋蛋做个体态评估吧, image: cat_body_table.jpg}
+    expect: [vlm_bcs, save_pet_event]
+
+  - id: S5
+    pet: dandan
+    day: -24
+    time: "21:05"
+    task_hint: symptom
+    turns:
+      - {text: 蛋蛋今晚吐了两次，精神有点蔫，最近刚换了新粮}
+      - {text: 这是刚才吐的东西，你看看严重吗, image: cat_vomit.jpg}
+      - {text: 那我先禁食观察，如果半夜又吐要送急诊吗？}
+    expect: [retrieve_vet_knowledge, save_pet_event, vlm_symptom, update_pet_event]
+    note: 旗舰多轮会话——RAG→存档→追图→VLM→事件追加→急诊阈值
+
+  - id: S6
+    pet: dandan
+    day: -14
+    time: "16:00"
+    task_hint: bcs
+    turns:
+      - {text: 呕吐好了之后感觉它瘦了一点？帮我看看体态有没有掉, image: cat_body_tire.jpg}
+    expect: [vlm_bcs]
+    note: BCS 第二个数据点；final 应结合最近 symptom 历史（context 注入的展示点）
+
+  - id: S7
+    pet: dandan
+    day: -10
+    time: "18:30"
+    task_hint: emotion
+    turns:
+      - {text: 它蹲在草丛里死死盯着一个方向快十分钟了，这是什么状态？, image: cat_emotion_hunt.jpg}
+    expect: [vlm_emotion]
+    note: 情绪任务的「候选情绪+置信度+单图局限」诚实输出展示
+
+  - id: S8
+    pet: dandan
+    day: -3
+    time: "12:00"
+    task_hint: chat
+    turns:
+      - {text: 下下周三上午十点带蛋蛋做年度疫苗体检，帮我设个提醒，以后每年都提醒我}
+    expect: [schedule_reminder]
+
+  # ---- 点点（4 条）----
+  - id: D1
+    pet: diandian
+    day: -64
+    time: "22:15"
+    task_hint: symptom
+    turns:
+      - {text: 点点刚才偷吃了茶几上一整块黑巧克力！大概 50 克，我该怎么办？！}
+      - {text: 我在上海松江大学城附近，最近的宠物急诊在哪？}
+    expect: [retrieve_vet_knowledge, save_pet_event, find_nearby_clinic]
+    note: 急救场景——RAG 剂量红线 + emergency 找医院，多工具串联
+
+  - id: D2
+    pet: diandian
+    day: -20
+    time: "17:40"
+    task_hint: bcs
+    turns:
+      - {text: 减肥四个多月了，帮点点评估一下现在的体态, image: dog_body_water.jpg}
+    expect: [vlm_bcs, save_pet_event]
+    note: final 应对照 -155 天 BCS 7 的起点讲进步（长期记忆展示点）
+
+  - id: D3
+    pet: diandian
+    day: -12
+    time: "19:00"
+    task_hint: chat
+    turns:
+      - {text: 今天带点点第一次下水游泳！她高兴疯了，一直不肯上岸, image: dog_swim_shake.jpg}
+    expect: [save_pet_event]
+    note: 期望 save milestone；轻松场景，情绪价值拉满
+
+  - id: D4
+    pet: diandian
+    day: -5
+    time: "08:50"
+    task_hint: chat
+    turns:
+      - {text: 点点今早称了 30.5 公斤}
+      - {text: 帮我总结一下她这半年的减肥成果吧}
+    expect: [save_pet_event_weight, query_pet_history]
+    note: 正是面试当天空回复翻车的场景——修复后的复仇局，也是现场演示的压轴预案
