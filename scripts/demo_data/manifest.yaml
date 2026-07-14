@@ -111,7 +111,7 @@ reminders:
     - {day: -45, time: "19:00", type: bath, message: 给蛋蛋洗澡, notified: true}
     - {day: +6,  time: "19:00", type: bath, message: 给蛋蛋洗澡（上次已隔 7 周）, notified: false}
     - {day: +18, time: "20:00", type: deworm, message: 蛋蛋体内外驱虫（大宠爱 + 海乐妙）, notified: false}
-    - {day: +11, time: "10:00", type: vaccine, message: 带蛋蛋做年度疫苗体检（S8 会话创建，seed 对齐）, notified: false, repeat_rule: yearly, from_session: S8}
+    - {day: +22, time: "10:00", type: checkup, message: 蛋蛋年度疫苗体检, notified: false, repeat_rule: yearly, from_session: S8}
   diandian:
     - {day: -50, time: "15:00", type: bath, message: 给点点洗澡梳毛, notified: true}
     - {day: +5,  time: "16:00", type: bath, message: 给点点洗澡（游泳后皮肤检查）, notified: false}
@@ -170,7 +170,7 @@ conversations:
     task_hint: symptom
     turns:
       - {text: 蛋蛋今晚吐了两次，精神有点蔫，最近刚换了新粮}
-      - {text: 这是刚才吐的东西，你看看严重吗, image: cat_vomit.jpg}
+      - {text: 这是刚才吐的东西，看着像毛和没消化的猫粮，帮我看看严重吗，顺便把细节记到刚才的记录里, image: cat_vomit.jpg}
       - {text: 那我先禁食观察，如果半夜又吐要送急诊吗？}
     expect: [retrieve_vet_knowledge, save_pet_event, vlm_symptom, update_pet_event]
     note: 旗舰多轮会话——RAG→存档→追图→VLM→事件追加→急诊阈值
