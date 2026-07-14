@@ -16,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import random
 import time
 from pathlib import Path
 from typing import Any, AsyncIterator, Optional
@@ -95,9 +96,11 @@ task = {task}
    **更新事件**：主人对你**刚 save 过的事件**追加细节时（如刚 save "呕吐"，本轮发呕吐物图佐证），改用 `update_pet_event(event_id=N)` 追加而不是新建——避免时间线重复条目。
    怎么知道刚 save 过？看对话上文 `[已调 tools: ...]` 摘要里的 `event_id=N`，或 system context「最近事件」里 `id=N` 的同类条目（仅限**今日**同 event_type）。
 
-3. **调工具时 content 写一句动作描述**：
-   - 调用工具时（tool_calls 非空那轮），content 简短描述"我下一步做什么"（≤30 字）+ 适当共情
-   - **第一次 tool 前必写**，让主人感知你在动手
+3. **调工具时 content 写"共情 + 动作宣告"**（≤60 字）：
+   - 调用工具时（tool_calls 非空那轮），content 先用半句回应主人的情绪，再宣告"我马上做什么"。
+     紧急时要有紧迫感：「天哪，巧克力对狗狗有风险！我马上查中毒剂量红线 🚨」
+     日常时轻松些：「听起来蛋蛋胃口不太对劲，我先翻翻资料看看怎么回事 📚」
+   - **第一次 tool 前必写**，让主人感知你在动手；动作宣告要有"我先/我来/我马上/我去查"这类明确动词
    - **不要**在调工具时的 content 里写分析、建议、结论——那是收尾 content 的事，提前写完了收尾就空了
    - 不调 tool 时直接写收尾 content（详细分析全留收尾那轮）
 
@@ -559,6 +562,25 @@ def _looks_like_preamble(text: str) -> bool:
     if len(t) < 1 or len(t) > 120:
         return False
     return any(w in t for w in _PREAMBLE_HINTS)
+
+
+# 工程补帧：Qwen3 偶尔一言不发直接调工具（content="" + tool_calls），
+# 这时给直播流补一句默认动机。变体池随机挑防僵硬；只 yield 不入库——
+# DB 的 content 始终只存模型原话，审计保持干净。
+_DEFAULT_MOTIVATIONS = {
+    'retrieve_vet_knowledge': ['我先查查兽医知识库 📚', '翻一下专业资料核实下 🔍', '让我确认下权威建议再说 📖'],
+    'save_pet_event': ['这个值得记进健康档案 🐾', '我来记录一下这条 📝', '先把这个存进时间线 🗂️'],
+    'update_pet_event': ['我把细节补进刚才的记录 📝', '更新一下之前那条记录 ✏️'],
+    'find_nearby_clinic': ['我马上找附近的医院 🏥', '这就查周边的宠物医院 📍'],
+    'schedule_reminder': ['我来安排这个提醒 ⏰', '这就设好日程提醒 📅'],
+    'query_pet_history': ['我翻翻它的历史记录 📊', '查一下过往的档案数据 🗂️'],
+    'reanalyze_image': ['让我再仔细看看这张图 🔎', '换个角度重新看下照片 👀'],
+}
+
+
+def _default_motivation(tool_name: str) -> str:
+    pool = _DEFAULT_MOTIVATIONS.get(tool_name)
+    return random.choice(pool) if pool else ''
 
 
 def _rescue_empty_content(msg) -> None:
@@ -1046,10 +1068,12 @@ async def run_agent_stream(
                 return
 
             # 中间 motivation 展示：Qwen3 经常 content="" 直接给 tools，
-            # 这时用 pending_motivation 兜底（上一轮被 transition retry 拒掉的"我先查 X"）
+            # 这时用 pending_motivation 兜底（上一轮被 transition retry 拒掉的"我先查 X"）；
+            # 还是没有 → 工程补帧给一句默认动机（只进直播流，不入库）
             display_motivation = msg.content or pending_motivation or ''
-            if display_motivation:
-                yield {'type': 'assistant_thinking', 'content': display_motivation}
+            shown_motivation = display_motivation or _default_motivation(msg.tool_calls[0].function.name)
+            if shown_motivation:
+                yield {'type': 'assistant_thinking', 'content': shown_motivation}
             pending_motivation = None  # 用过就清——避免一个 motivation 串到下一个 tool 上
 
             # 执行 tool_calls
