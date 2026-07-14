@@ -118,12 +118,15 @@ function renderPayload(eventType, payload) {
         </p>
       )
     case 'feeding':
-    case 'grooming':
+    case 'grooming': {
+      const text = payload.description || payload.note_text
+      if (!text) return null // 空 payload 时靠下方 note 行，不 dump "{}"
       return (
         <p className="text-sm" style={{ color: 'var(--v4-ink)' }}>
-          {payload.description || payload.note_text || JSON.stringify(payload)}
+          {text}
         </p>
       )
+    }
     default: {
       const entries = Object.entries(payload).filter(([, v]) => v != null && v !== '')
       if (entries.length === 0) return null
@@ -213,26 +216,35 @@ export default function EventList({ events, onDelete }) {
                     </span>
                   )}
                 </p>
-              ) : ev.event_type === 'milestone' && ev.payload?.title ? (
+              ) : ev.event_type === 'milestone' ? (
                 <div className="text-sm" style={{ color: 'var(--v4-ink)' }}>
                   <p className="font-medium inline-flex items-center gap-1">
                     <Illo name="crown" size={14} color="var(--v4-warn)" />
-                    {ev.payload.title}
+                    {/* LLM 存 milestone 时偶尔只写 note 不填 payload.title——兜底用 note 当标题 */}
+                    {ev.payload?.title || ev.note || '里程碑时刻'}
                   </p>
-                  {ev.payload.description && (
+                  {ev.payload?.description && (
                     <p className="text-xs mt-0.5" style={{ color: 'var(--v4-mute)' }}>
                       {ev.payload.description}
                     </p>
                   )}
                 </div>
-              ) : ev.event_type === 'note' && ev.payload?.text ? (
-                <p className="text-sm" style={{ color: 'var(--v4-ink)' }}>
-                  {ev.payload.text}
-                </p>
+              ) : ev.event_type === 'note' &&
+                (ev.payload?.text || ev.payload?.description || ev.payload?.summary || ev.payload?.title) ? (
+                <div className="text-sm" style={{ color: 'var(--v4-ink)' }}>
+                  {/* LLM 存 note 的 payload 字段名不稳定（text/title+description/summary），全兼容 */}
+                  {ev.payload.title && <p className="font-medium">{ev.payload.title}</p>}
+                  {(ev.payload.text || ev.payload.description || ev.payload.summary) && (
+                    <p className={ev.payload.title ? 'text-xs mt-0.5' : ''}
+                       style={ev.payload.title ? { color: 'var(--v4-mute)' } : undefined}>
+                      {ev.payload.text || ev.payload.description || ev.payload.summary}
+                    </p>
+                  )}
+                </div>
               ) : (
                 renderPayload(ev.event_type, ev.payload)
               )}
-              {ev.note && (
+              {ev.note && !(ev.event_type === 'milestone' && !ev.payload?.title) && (
                 <p className="text-xs mt-1.5 inline-flex items-center gap-1" style={{ color: 'var(--v4-mute)' }}>
                   <Illo name="leaf" size={10} color="var(--v4-mute)" />
                   {ev.note}
