@@ -56,7 +56,7 @@ cases:
     expected:
       task: [chat]
       tools_required: [save_pet_event]
-      final_contains: [体重, 公斤, kg, 记录, 4.4]  # any-of
+      final_contains: [体重, 公斤, kg, 记录, '4.4']  # any-of
 
   - id: a08
     query: "我在北京海淀，帮我找附近 24 小时宠物急诊"
@@ -120,7 +120,7 @@ cases:
     expected:
       task: [chat, symptom]
       tools_required: [retrieve_vet_knowledge]
-      final_contains: [零食, 10, 热量]  # any-of
+      final_contains: [零食, '10', 热量]  # any-of
 
   - id: n07
     query: "老年猫的饮食需要注意什么"
