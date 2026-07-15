@@ -163,7 +163,9 @@ def main():
     lines.append('# PetPal Agent E2E 评测报告（P7 Step B）')
     lines.append('')
     lines.append(f'> **N={len(cases)} cases × {N_RUNS} runs = {total_runs} total**')
-    lines.append('> LLM 非确定性（gpt-4o-mini, temperature=0.5）→ 单次跑不严谨，跑 3 轮看 case 稳定性。')
+    import os as _os
+    _model = _os.getenv('LLM_MODEL', 'openai/gpt-4o-mini')
+    lines.append(f'> LLM 非确定性（{_model}, temperature=0.5）→ 单次跑不严谨，跑 {N_RUNS} 轮看 case 稳定性。')
     lines.append('')
 
     # 总览
