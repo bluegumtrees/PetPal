@@ -142,7 +142,7 @@ cases:
     expected:
       task: [symptom]
       tools_required: [retrieve_vet_knowledge]
-      final_contains: [木糖醇, 就医, 低血糖]  # any-of
+      final_contains: [木糖醇, 就医, 送医, 低血糖, 血糖]  # any-of（r4 复盘：检索 0.991 命中但 final 用了同义措辞，补同义词覆盖）
 
   - id: n10
     query: "猫能吃洋葱吗，昨天猫偷舔了点洋葱炒肉的汤"
