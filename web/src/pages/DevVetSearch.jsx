@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react'
+import { V4Btn, V4Card, Illo } from '../components/v4'
 
 const EXAMPLES = [
   '猫呕吐带血',
   '狗咳嗽',
   'BCS 5 是什么意思',
-  '猫不吃饭一天',
+  '猫挑食不吃主粮',
   '幼犬疫苗时间',
   '误食巧克力怎么办',
-  '猫尾巴抽打代表什么',
+  '狗减肥一周减多少',
 ]
 
 export default function DevVetSearch() {
@@ -72,97 +73,133 @@ export default function DevVetSearch() {
 
   return (
     <div>
-      <div className="mb-4 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 text-xs text-slate-500">
-        <span>⚙</span> 开发者后台 · 直接调 RAG 检索
+      {/* 页头：这页也是面试讲检索的展台，把架构一句话讲清 */}
+      <div className="mb-4">
+        <div
+          className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs"
+          style={{ background: 'var(--v4-tint)', color: 'var(--v4-mute)' }}
+        >
+          <Illo name="sparkle" size={11} color="var(--v4-accent)" />
+          检索调试 · 直连三阶段混合检索
+        </div>
+        <p className="text-xs mt-2" style={{ color: 'var(--v4-faint)' }}>
+          473 条知识库 · 稠密（BGE + Chroma）+ 稀疏（BM25 + jieba）→ RRF 融合 → CrossEncoder 重排
+        </p>
       </div>
 
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          submit()
-        }}
-        className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5"
-      >
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="搜索兽医知识 (例如: 猫呕吐带血)"
-            className="flex-1 px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-amber-400 text-slate-800"
-          />
-          <button
-            type="submit"
-            disabled={!q.trim() || state.kind === 'loading'}
-            className="px-5 py-2.5 rounded-xl bg-amber-500 text-white font-medium hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition"
-          >
-            {state.kind === 'loading' ? '搜索中…' : '搜索'}
-          </button>
-        </div>
-
-        <div className="mt-3 flex flex-wrap gap-2">
-          {EXAMPLES.map((ex) => (
-            <button
-              key={ex}
-              type="button"
-              onClick={() => pickExample(ex)}
-              className="px-2.5 py-1 rounded-full bg-slate-100 hover:bg-slate-200 text-xs text-slate-600 transition"
+      <V4Card padding="p-5" className="rounded-2xl">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            submit()
+          }}
+        >
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="搜索兽医知识 (例如: 猫呕吐带血)"
+              className="flex-1 px-4 py-2.5 rounded-xl border focus:outline-none text-sm"
+              style={{
+                background: 'var(--v4-card)',
+                borderColor: 'var(--v4-line)',
+                color: 'var(--v4-ink)',
+              }}
+            />
+            <V4Btn
+              type="submit"
+              variant="primary"
+              disabled={!q.trim() || state.kind === 'loading'}
+              className="disabled:opacity-50"
             >
-              {ex}
-            </button>
-          ))}
-        </div>
+              {state.kind === 'loading' ? '搜索中…' : '搜索'}
+            </V4Btn>
+          </div>
 
-        <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
-          <Segmented
-            label="物种"
-            value={species}
-            onChange={setSpecies}
-            options={[
-              { v: 'all', label: '全部' },
-              { v: 'cat', label: '🐱 仅猫' },
-              { v: 'dog', label: '🐶 仅狗' },
-            ]}
-          />
-          <Segmented
-            label="severity"
-            value={severity}
-            onChange={setSeverity}
-            options={[
-              { v: '', label: '全部' },
-              { v: 'low', label: 'low' },
-              { v: 'medium', label: 'med' },
-              { v: 'high', label: 'high' },
-            ]}
-          />
-          <label className="flex items-center gap-1.5 text-slate-600">
-            <input
-              type="checkbox"
-              checked={emergencyOnly}
-              onChange={(e) => setEmergencyOnly(e.target.checked)}
-              className="rounded"
-            />
-            只看 emergency
-          </label>
-          <label className="flex items-center gap-1.5 text-slate-600">
-            <input
-              type="checkbox"
-              checked={rerank}
-              onChange={(e) => setRerank(e.target.checked)}
-              className="rounded"
-            />
-            rerank
-          </label>
-        </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {EXAMPLES.map((ex) => (
+              <button
+                key={ex}
+                type="button"
+                onClick={() => pickExample(ex)}
+                className="px-2.5 py-1 rounded-full text-xs transition"
+                style={{ background: 'var(--v4-tint)', color: 'var(--v4-mute)' }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--v4-ink)')}
+                onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--v4-mute)')}
+              >
+                {ex}
+              </button>
+            ))}
+          </div>
 
-        {searched && (
-          <p className="mt-3 text-xs text-slate-400">
-            <span className="text-slate-500">filter / rerank 改变自动重搜，</span>
-            当前 query: <code className="bg-slate-100 px-1.5 py-0.5 rounded">{searched}</code>{' '}
-            · rerank=<code className="bg-slate-100 px-1.5 py-0.5 rounded">{String(rerank)}</code>
-          </p>
-        )}
-      </form>
+          <div
+            className="mt-4 pt-4 border-t flex flex-wrap items-center gap-x-5 gap-y-2 text-sm"
+            style={{ borderColor: 'var(--v4-line)' }}
+          >
+            <Segmented
+              label="物种"
+              value={species}
+              onChange={setSpecies}
+              options={[
+                { v: 'all', label: '全部' },
+                { v: 'cat', label: '🐱 仅猫' },
+                { v: 'dog', label: '🐶 仅狗' },
+              ]}
+            />
+            <Segmented
+              label="severity"
+              value={severity}
+              onChange={setSeverity}
+              options={[
+                { v: '', label: '全部' },
+                { v: 'low', label: 'low' },
+                { v: 'medium', label: 'med' },
+                { v: 'high', label: 'high' },
+              ]}
+            />
+            <label className="flex items-center gap-1.5" style={{ color: 'var(--v4-mute)' }}>
+              <input
+                type="checkbox"
+                checked={emergencyOnly}
+                onChange={(e) => setEmergencyOnly(e.target.checked)}
+                className="rounded"
+                style={{ accentColor: 'var(--v4-accent)' }}
+              />
+              只看 emergency
+            </label>
+            <label className="flex items-center gap-1.5" style={{ color: 'var(--v4-mute)' }}>
+              <input
+                type="checkbox"
+                checked={rerank}
+                onChange={(e) => setRerank(e.target.checked)}
+                className="rounded"
+                style={{ accentColor: 'var(--v4-accent)' }}
+              />
+              rerank
+            </label>
+          </div>
+
+          {searched && (
+            <p className="mt-3 text-xs" style={{ color: 'var(--v4-faint)' }}>
+              filter / rerank 改变自动重搜 · 当前 query:{' '}
+              <code
+                className="px-1.5 py-0.5 rounded"
+                style={{ background: 'var(--v4-tint)', color: 'var(--v4-mute)' }}
+              >
+                {searched}
+              </code>{' '}
+              · rerank=
+              <code
+                className="px-1.5 py-0.5 rounded"
+                style={{ background: 'var(--v4-tint)', color: 'var(--v4-mute)' }}
+              >
+                {String(rerank)}
+              </code>
+            </p>
+          )}
+        </form>
+      </V4Card>
 
       <div className="mt-6">
         <ResultsArea state={state} />
@@ -174,23 +211,35 @@ export default function DevVetSearch() {
 function Segmented({ label, value, onChange, options }) {
   return (
     <div className="flex items-center gap-1.5">
-      <span className="text-slate-500 text-xs">{label}</span>
-      <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
-        {options.map((opt) => (
-          <button
-            key={opt.v}
-            type="button"
-            onClick={() => onChange(opt.v)}
-            className={
-              'px-2.5 py-1 rounded-md text-xs transition ' +
-              (value === opt.v
-                ? 'bg-white text-slate-800 shadow-sm'
-                : 'text-slate-500 hover:text-slate-700')
-            }
-          >
-            {opt.label}
-          </button>
-        ))}
+      <span className="text-xs" style={{ color: 'var(--v4-faint)' }}>
+        {label}
+      </span>
+      <div
+        className="inline-flex rounded-lg border p-0.5"
+        style={{ borderColor: 'var(--v4-line)', background: 'var(--v4-tint)' }}
+      >
+        {options.map((opt) => {
+          const active = value === opt.v
+          return (
+            <button
+              key={opt.v}
+              type="button"
+              onClick={() => onChange(opt.v)}
+              className="px-2.5 py-1 rounded-md text-xs transition"
+              style={
+                active
+                  ? {
+                      background: 'var(--v4-card)',
+                      color: 'var(--v4-ink)',
+                      boxShadow: 'var(--v4-shadow-sm)',
+                    }
+                  : { color: 'var(--v4-mute)' }
+              }
+            >
+              {opt.label}
+            </button>
+          )
+        })}
       </div>
     </div>
   )
@@ -199,24 +248,34 @@ function Segmented({ label, value, onChange, options }) {
 function ResultsArea({ state }) {
   if (state.kind === 'idle') {
     return (
-      <p className="text-sm text-slate-400 text-center py-12">
+      <p className="text-sm text-center py-12" style={{ color: 'var(--v4-faint)' }}>
         输入关键词或点上方任意示例
       </p>
     )
   }
   if (state.kind === 'loading') {
     return (
-      <div className="text-sm text-slate-500 text-center py-12">
-        <span className="inline-block w-2 h-2 rounded-full bg-amber-400 animate-pulse mr-2" />
+      <div className="text-sm text-center py-12" style={{ color: 'var(--v4-mute)' }}>
+        <span
+          className="inline-block w-2 h-2 rounded-full animate-pulse mr-2"
+          style={{ background: 'var(--v4-accent)' }}
+        />
         三阶段检索中（dense + sparse + rerank）…
       </div>
     )
   }
   if (state.kind === 'error') {
     return (
-      <div className="rounded-xl bg-red-50 border border-red-200 p-4 text-sm">
-        <p className="text-red-700 font-medium">搜索失败</p>
-        <p className="text-red-600 break-all mt-1">{state.msg}</p>
+      <div
+        className="rounded-xl border p-4 text-sm"
+        style={{ background: 'var(--v4-warn-soft)', borderColor: 'var(--v4-warn)' }}
+      >
+        <p className="font-medium" style={{ color: 'var(--v4-warn)' }}>
+          搜索失败
+        </p>
+        <p className="break-all mt-1" style={{ color: 'var(--v4-warn)' }}>
+          {state.msg}
+        </p>
       </div>
     )
   }
@@ -224,15 +283,19 @@ function ResultsArea({ state }) {
   const { data, ms, rerank } = state
   return (
     <div>
-      <p className="text-xs text-slate-500 mb-3">
-        命中 <span className="font-medium text-slate-700">{data.count}</span> 条 · 耗时 {ms} ms ·{' '}
-        <span className={rerank ? 'text-emerald-600' : 'text-slate-400'}>
+      <p className="text-xs mb-3" style={{ color: 'var(--v4-mute)' }}>
+        命中 <span className="font-medium" style={{ color: 'var(--v4-ink)' }}>{data.count}</span> 条
+        · 耗时 {ms} ms ·{' '}
+        <span style={{ color: rerank ? 'var(--v4-second)' : 'var(--v4-faint)' }}>
           {rerank ? 'rerank ON' : 'rerank OFF（仅 RRF）'}
         </span>
         {Object.keys(data.filters).length > 0 && (
           <>
             {' · 过滤: '}
-            <code className="bg-slate-100 px-1.5 py-0.5 rounded">
+            <code
+              className="px-1.5 py-0.5 rounded"
+              style={{ background: 'var(--v4-tint)' }}
+            >
               {JSON.stringify(data.filters)}
             </code>
           </>
@@ -250,36 +313,57 @@ function ResultsArea({ state }) {
 function ResultCard({ result, rank }) {
   const m = result.meta || {}
   return (
-    <article className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm hover:shadow-md transition">
+    <article
+      className="rounded-xl border p-4 transition"
+      style={{
+        background: 'var(--v4-card)',
+        borderColor: 'var(--v4-line)',
+        boxShadow: 'var(--v4-shadow-sm)',
+      }}
+    >
       <header className="flex items-start gap-2 mb-2">
-        <span className="text-xs font-mono text-slate-400 mt-0.5">#{rank}</span>
+        <span className="text-xs font-mono mt-0.5" style={{ color: 'var(--v4-faint)' }}>
+          #{rank}
+        </span>
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-slate-800">{result.title}</h3>
-          <p className="text-xs text-slate-500 mt-0.5 truncate">
-            <code className="bg-slate-100 px-1 rounded">{result.id}</code>
+          <h3 className="font-semibold" style={{ color: 'var(--v4-ink)' }}>
+            {result.title}
+          </h3>
+          <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--v4-mute)' }}>
+            <code className="px-1 rounded" style={{ background: 'var(--v4-tint)' }}>
+              {result.id}
+            </code>
             {m.source && <span> · {m.source}</span>}
-            <span className="ml-2 text-slate-400">score {result.score.toFixed(3)}</span>
+            <span className="ml-2" style={{ color: 'var(--v4-faint)' }}>
+              score {result.score.toFixed(3)}
+            </span>
           </p>
         </div>
         <div className="flex flex-wrap gap-1 justify-end">
           {m.emergency && (
-            <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700 border border-red-200">
+            <span
+              className="px-1.5 py-0.5 rounded text-xs font-medium"
+              style={{ background: 'var(--v4-warn-soft)', color: 'var(--v4-warn)' }}
+            >
               急诊
             </span>
           )}
           {m.severity && (
-            <span className={'px-1.5 py-0.5 rounded text-xs font-medium border ' + severityClass(m.severity)}>
+            <span
+              className="px-1.5 py-0.5 rounded text-xs font-medium"
+              style={severityStyle(m.severity)}
+            >
               {m.severity}
             </span>
           )}
           {(m.species || []).map((s) => (
             <span
               key={s}
-              className={
-                'px-1.5 py-0.5 rounded text-xs border ' +
-                (s === '猫'
-                  ? 'bg-pink-50 text-pink-700 border-pink-200'
-                  : 'bg-sky-50 text-sky-700 border-sky-200')
+              className="px-1.5 py-0.5 rounded text-xs"
+              style={
+                s === '猫'
+                  ? { background: 'var(--v4-accent-soft)', color: 'var(--v4-accent-deep)' }
+                  : { background: 'var(--v4-tint)', color: 'var(--v4-second)' }
               }
             >
               {s === '猫' ? '🐱' : '🐶'} {s}
@@ -287,13 +371,16 @@ function ResultCard({ result, rank }) {
           ))}
         </div>
       </header>
-      <div className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
+      <div
+        className="text-sm whitespace-pre-wrap leading-relaxed"
+        style={{ color: 'var(--v4-ink)' }}
+      >
         {result.body}
       </div>
       {(m.tags || []).length > 0 && (
         <div className="mt-3 flex flex-wrap gap-1">
           {m.tags.map((t) => (
-            <span key={t} className="text-xs text-slate-400">
+            <span key={t} className="text-xs" style={{ color: 'var(--v4-faint)' }}>
               #{t}
             </span>
           ))}
@@ -303,8 +390,9 @@ function ResultCard({ result, rank }) {
   )
 }
 
-function severityClass(sev) {
-  if (sev === 'high') return 'bg-orange-50 text-orange-700 border-orange-200'
-  if (sev === 'medium') return 'bg-yellow-50 text-yellow-700 border-yellow-200'
-  return 'bg-slate-50 text-slate-600 border-slate-200'
+function severityStyle(sev) {
+  if (sev === 'high') return { background: 'var(--v4-warn-soft)', color: 'var(--v4-warn)' }
+  if (sev === 'medium')
+    return { background: 'var(--v4-accent-soft)', color: 'var(--v4-accent-deep)' }
+  return { background: 'var(--v4-tint)', color: 'var(--v4-mute)' }
 }

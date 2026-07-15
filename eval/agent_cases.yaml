@@ -1,11 +1,14 @@
-# PetPal Agent end-to-end light eval（P7 Step B）
+# PetPal Agent end-to-end eval（P7 Step B → 扩容 v2）
 #
-# 10 条文字 only case，N=10 单次跑，LLM 非确定性参考价值有限。
+# v1: 10 条 × 3 runs（2026-05）。v2（2026-07）: 30 条 × 3 runs，
+# 新增 n 组 20 条覆盖：营养/减重/换粮/挑食（KB 473 条扩充后）、禁忌食物、
+# 新增病种（FeLV/FIP/犬窝咳/牙科/认知障碍）、历史查询、提醒变体。
 # 跑：python eval/eval_agent.py
 
-pet_id: 3  # 小肥 (cat) — db 里现有 pet
+pet_id: 23  # 蛋蛋 (cat, 黄金 demo 档案) — 本地 db 由 scripts/seed_demo.py 生成
 
 cases:
+  # ===== v1 原 10 条（a06/a07 宠物名 小肥→蛋蛋，判定标准不变）=====
   - id: a01
     query: "我家猫昨晚吐了 3 次都是黄水，今天没什么精神"
     expected:
@@ -42,18 +45,18 @@ cases:
       final_contains: [焦虑]
 
   - id: a06
-    query: "提醒我下周二上午 9 点给小肥打猫三联，以后每年提醒一次"
+    query: "提醒我下周二上午 9 点给蛋蛋打猫三联，以后每年提醒一次"
     expected:
       task: [chat]
       tools_required: [schedule_reminder]
       final_contains: [提醒]
 
   - id: a07
-    query: "记一下小肥今天称了 8.5 公斤"
+    query: "记一下蛋蛋今天称了 4.4 公斤"
     expected:
       task: [chat]
       tools_required: [save_pet_event]
-      final_contains: [体重, 公斤, kg, 记录, 8.5]  # any-of
+      final_contains: [体重, 公斤, kg, 记录, 4.4]  # any-of
 
   - id: a08
     query: "我在北京海淀，帮我找附近 24 小时宠物急诊"
@@ -75,3 +78,147 @@ cases:
       task: [chat]
       tools_forbidden: [retrieve_vet_knowledge, save_pet_event, find_nearby_clinic, schedule_reminder]
       final_contains: []  # 不强检查关键词
+
+  # ===== v2 新增：营养与喂养（KB 16/17 文件）=====
+  - id: n01
+    query: "猫吃了冻干零食以后挑食不吃猫粮了怎么办"
+    expected:
+      task: [symptom, chat]
+      tools_required: [retrieve_vet_knowledge]
+      final_contains: [零食, 挑食, 定时]  # any-of
+
+  - id: n02
+    query: "狗减肥一周减多少体重是安全的"
+    expected:
+      task: [chat, symptom]
+      tools_required: [retrieve_vet_knowledge]
+      final_contains: [减重, 减肥, 1%, 2%]  # any-of
+
+  - id: n03
+    query: "两个月大的小猫一天应该喂几顿"
+    expected:
+      task: [chat, symptom]
+      tools_required: [retrieve_vet_knowledge]
+      final_contains: [喂, 顿, 次]  # any-of
+
+  - id: n04
+    query: "我家猫不爱喝水，有什么办法让它多喝水"
+    expected:
+      task: [chat, symptom]
+      tools_required: [retrieve_vet_knowledge]
+      final_contains: [水]
+
+  - id: n05
+    query: "想给猫换新粮，怎么换才不会拉肚子"
+    expected:
+      task: [chat, symptom]
+      tools_required: [retrieve_vet_knowledge]
+      final_contains: [过渡, 换粮, 比例]  # any-of
+
+  - id: n06
+    query: "每天能给狗吃多少零食不算过量"
+    expected:
+      task: [chat, symptom]
+      tools_required: [retrieve_vet_knowledge]
+      final_contains: [零食, 10, 热量]  # any-of
+
+  - id: n07
+    query: "老年猫的饮食需要注意什么"
+    expected:
+      task: [chat, symptom]
+      tools_required: [retrieve_vet_knowledge]
+      final_contains: [老年, 蛋白, 饮食]  # any-of
+
+  # ===== v2 新增：禁忌食物 / 中毒红线（KB 08 扩充）=====
+  - id: n08
+    query: "狗吃了几颗葡萄要紧吗"
+    expected:
+      task: [symptom]
+      tools_required: [retrieve_vet_knowledge]
+      final_contains: [葡萄, 就医, 肾]  # any-of
+
+  - id: n09
+    query: "狗偷吃了一片无糖口香糖会中毒吗"
+    expected:
+      task: [symptom]
+      tools_required: [retrieve_vet_knowledge]
+      final_contains: [木糖醇, 就医, 低血糖]  # any-of
+
+  - id: n10
+    query: "猫能吃洋葱吗，昨天猫偷舔了点洋葱炒肉的汤"
+    expected:
+      task: [symptom]
+      tools_required: [retrieve_vet_knowledge]
+      final_contains: [洋葱, 溶血, 就医]  # any-of
+
+  # ===== v2 新增：扩充病种（KB 19/20 文件）=====
+  - id: n11
+    query: "猫白血病病毒会传染给家里其他猫吗"
+    expected:
+      task: [symptom, chat]
+      tools_required: [retrieve_vet_knowledge]
+      final_contains: [传染, 接触, 隔离]  # any-of
+
+  - id: n12
+    query: "听说猫传腹很致命，早期有什么信号"
+    expected:
+      task: [symptom, chat]
+      tools_required: [retrieve_vet_knowledge]
+      final_contains: [传染性腹膜炎, FIP, 发热, 腹水]  # any-of
+
+  - id: n13
+    query: "狗从宠物店接回来以后一直咳嗽，像卡了东西一样"
+    expected:
+      task: [symptom]
+      tools_required: [retrieve_vet_knowledge]
+      final_contains: [咳, 犬窝咳]  # any-of
+
+  - id: n14
+    query: "猫口臭还流口水，牙龈看着发红"
+    expected:
+      task: [symptom]
+      tools_required: [retrieve_vet_knowledge]
+      final_contains: [牙, 口腔]  # any-of
+
+  - id: n15
+    query: "十四岁的老猫半夜乱叫白天转圈，是老年痴呆吗"
+    expected:
+      task: [symptom, chat]
+      tools_required: [retrieve_vet_knowledge]
+      final_contains: [认知, 老年, 兽医]  # any-of
+
+  - id: n16
+    query: "猫突然不在猫砂盆里尿，到处乱尿"
+    expected:
+      task: [symptom]
+      tools_required: [retrieve_vet_knowledge]
+      final_contains: [猫砂, 泌尿, 应激]  # any-of
+
+  # ===== v2 新增：档案与历史（memory 面）=====
+  - id: n17
+    query: "帮我总结一下蛋蛋最近的健康状况"
+    expected:
+      task: [chat, symptom]
+      tools_required: [query_pet_history]
+      final_contains: [蛋蛋]
+
+  - id: n18
+    query: "蛋蛋上次打疫苗是什么时候"
+    expected:
+      task: [chat]
+      tools_required: [query_pet_history]
+      final_contains: [疫苗]
+
+  - id: n19
+    query: "多久给猫称一次体重比较合适"
+    expected:
+      task: [chat, symptom]
+      tools_required: [retrieve_vet_knowledge]
+      final_contains: [体重, 周]  # any-of
+
+  - id: n20
+    query: "每个月 1 号提醒我给蛋蛋体内驱虫"
+    expected:
+      task: [chat]
+      tools_required: [schedule_reminder]
+      final_contains: [提醒, 驱虫]  # any-of
