@@ -343,6 +343,10 @@ def run_agent(
                 temperature=0.5,
                 max_tokens=1500,
             )
+            if _provider_order():
+                llm_kwargs['extra_body'] = {
+                    'provider': {'order': _provider_order(), 'allow_fallbacks': True},
+                }
             if force_prose_next:
                 llm_kwargs['tool_choice'] = 'none'
                 force_prose_next = False
@@ -581,6 +585,13 @@ _DEFAULT_MOTIVATIONS = {
 def _default_motivation(tool_name: str) -> str:
     pool = _DEFAULT_MOTIVATIONS.get(tool_name)
     return random.choice(pool) if pool else ''
+
+
+def _provider_order() -> list[str]:
+    """OpenRouter provider 偏好（逗号分隔）。默认锁 DeepInfra（8 连发实测零空响应）；
+    设 LLM_PROVIDER_ORDER='' 可完全关闭偏好，恢复自动路由。"""
+    raw = os.getenv('LLM_PROVIDER_ORDER', 'DeepInfra')
+    return [p.strip() for p in raw.split(',') if p.strip()]
 
 
 def _rescue_empty_content(msg) -> None:
@@ -934,6 +945,12 @@ async def run_agent_stream(
                     temperature=0.5,
                     max_tokens=1500,
                 )
+                if _provider_order():
+                    # OpenRouter provider 轮盘里混有会返回空响应的供应商；
+                    # 优先实测稳定的（默认 DeepInfra），仍允许回退保可用性
+                    llm_kwargs['extra_body'] = {
+                        'provider': {'order': _provider_order(), 'allow_fallbacks': True},
+                    }
                 if force_prose_next:
                     llm_kwargs['tool_choice'] = 'none'
                     force_prose_next = False
@@ -949,7 +966,8 @@ async def run_agent_stream(
             _rescue_empty_content(msg)
             _content_preview = (msg.content or '').replace('\n', ' ')[:100]
             _tools_preview = [tc.function.name for tc in msg.tool_calls] if msg.tool_calls else []
-            print(f'[stream]   content={_content_preview!r} tools={_tools_preview}', flush=True)
+            print(f'[stream]   content={_content_preview!r} tools={_tools_preview} '
+                  f'finish={resp.choices[0].finish_reason} provider={getattr(resp, "provider", "?")}', flush=True)
             assistant_msg: dict[str, Any] = {
                 'role': 'assistant',
                 'content': msg.content or '',
