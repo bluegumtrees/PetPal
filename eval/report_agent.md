@@ -1,47 +1,192 @@
 # PetPal Agent E2E 评测报告（P7 Step B）
 
-> **N=10 cases × 3 runs = 30 total**
-> LLM 非确定性（gpt-4o-mini, temperature=0.5）→ 单次跑不严谨，跑 3 轮看 case 稳定性。
+> **N=30 cases × 3 runs = 90 total**
+> LLM 非确定性（qwen/qwen3-235b-a22b-2507, temperature=0.5）→ 单次跑不严谨，跑 3 轮看 case 稳定性。
 
 ## 1. 总览
 
-- **总 run pass rate**: 29 / 30 (96.7%)
+- **总 run pass rate**: 64 / 90 (71.1%)
 - **case 稳定性分布**：
-  - 🟢 稳定 pass（3/3）: **9 / 10** — a01, a02, a03, a04, a05, a06, a07, a09, a10
-  - 🟡 部分 pass（1-2/3）: **1 / 10** — a08  *(LLM 非确定性)*
-  - 🔴 稳定 fail（0/3）: **0 / 10** — 无  *(真实问题)*
+  - 🟢 稳定 pass（3/3）: **14 / 30** — a02, a07, a08, n01, n02, n03, n04, n05, n11, n14, n16, n18, n19, n20
+  - 🟡 部分 pass（1-2/3）: **13 / 30** — a01, a03, a04, a05, a06, a09, a10, n06, n07, n08, n10, n12, n15  *(LLM 非确定性)*
+  - 🔴 稳定 fail（0/3）: **3 / 30** — n09, n13, n17  *(真实问题)*
 
-- 跨 run 维度命中率（30 次）:
-  - task routing 正确: 30 / 30 (100%)
-  - tools_required 齐: 29 / 30 (97%)
-  - tools_forbidden 未触: 30 / 30 (100%)
-  - final 关键词命中: 30 / 30 (100%)
-- 单次耗时: 均值 15.0s / 中位 14.7s / 最大 49.1s
+- 跨 run 维度命中率（90 次）:
+  - task routing 正确: 85 / 90 (94%)
+  - tools_required 齐: 72 / 90 (80%)
+  - tools_forbidden 未触: 83 / 90 (92%)
+  - final 关键词命中: 76 / 90 (84%)
+- 单次耗时: 均值 24.0s / 中位 23.2s / 最大 73.3s
 
 ## 2. Per-case 稳定性矩阵
 
 | id | query (truncated) | run1 | run2 | run3 | 稳定性 | 分类 |
 |---|---|---|---|---|---|---|
-| a01 | 我家猫昨晚吐了 3 次都是黄水，今天… | ✓ | ✓ | ✓ | 3/3 | 🟢 稳 pass |
+| a01 | 我家猫昨晚吐了 3 次都是黄水，今天… | ✓ | ✓ | ✗ | 2/3 | 🟡 部分 |
 | a02 | 我家狗一直拉稀 3 天了，便里有血，… | ✓ | ✓ | ✓ | 3/3 | 🟢 稳 pass |
-| a03 | 我家狗刚才误食了一整块巧克力，大概 … | ✓ | ✓ | ✓ | 3/3 | 🟢 稳 pass |
-| a04 | 老猫得了慢性肾病早期会有什么症状 | ✓ | ✓ | ✓ | 3/3 | 🟢 稳 pass |
-| a05 | 狗分离焦虑怎么治 | ✓ | ✓ | ✓ | 3/3 | 🟢 稳 pass |
-| a06 | 提醒我下周二上午 9 点给小肥打猫三… | ✓ | ✓ | ✓ | 3/3 | 🟢 稳 pass |
-| a07 | 记一下小肥今天称了 8.5 公斤 | ✓ | ✓ | ✓ | 3/3 | 🟢 稳 pass |
-| a08 | 我在北京海淀，帮我找附近 24 小时… | ✗ | ✓ | ✓ | 2/3 | 🟡 部分 |
-| a09 | 家附近哪里有宠物医院 | ✓ | ✓ | ✓ | 3/3 | 🟢 稳 pass |
-| a10 | 我家猫今天好可爱啊 | ✓ | ✓ | ✓ | 3/3 | 🟢 稳 pass |
+| a03 | 我家狗刚才误食了一整块巧克力，大概 … | ✓ | ✗ | ✓ | 2/3 | 🟡 部分 |
+| a04 | 老猫得了慢性肾病早期会有什么症状 | ✗ | ✓ | ✓ | 2/3 | 🟡 部分 |
+| a05 | 狗分离焦虑怎么治 | ✗ | ✓ | ✗ | 1/3 | 🟡 部分 |
+| a06 | 提醒我下周二上午 9 点给蛋蛋打猫三… | ✗ | ✓ | ✓ | 2/3 | 🟡 部分 |
+| a07 | 记一下蛋蛋今天称了 4.4 公斤 | ✓ | ✓ | ✓ | 3/3 | 🟢 稳 pass |
+| a08 | 我在北京海淀，帮我找附近 24 小时… | ✓ | ✓ | ✓ | 3/3 | 🟢 稳 pass |
+| a09 | 家附近哪里有宠物医院 | ✓ | ✗ | ✗ | 1/3 | 🟡 部分 |
+| a10 | 我家猫今天好可爱啊 | ✓ | ✗ | ✓ | 2/3 | 🟡 部分 |
+| n01 | 猫吃了冻干零食以后挑食不吃猫粮了怎么… | ✓ | ✓ | ✓ | 3/3 | 🟢 稳 pass |
+| n02 | 狗减肥一周减多少体重是安全的 | ✓ | ✓ | ✓ | 3/3 | 🟢 稳 pass |
+| n03 | 两个月大的小猫一天应该喂几顿 | ✓ | ✓ | ✓ | 3/3 | 🟢 稳 pass |
+| n04 | 我家猫不爱喝水，有什么办法让它多喝水 | ✓ | ✓ | ✓ | 3/3 | 🟢 稳 pass |
+| n05 | 想给猫换新粮，怎么换才不会拉肚子 | ✓ | ✓ | ✓ | 3/3 | 🟢 稳 pass |
+| n06 | 每天能给狗吃多少零食不算过量 | ✓ | ✓ | ⚠ | 2/3 | 🟡 部分 |
+| n07 | 老年猫的饮食需要注意什么 | ⚠ | ✓ | ⚠ | 1/3 | 🟡 部分 |
+| n08 | 狗吃了几颗葡萄要紧吗 | ✗ | ✓ | ✓ | 2/3 | 🟡 部分 |
+| n09 | 狗偷吃了一片无糖口香糖会中毒吗 | ✗ | ⚠ | ✗ | 0/3 | 🔴 稳 fail |
+| n10 | 猫能吃洋葱吗，昨天猫偷舔了点洋葱炒肉… | ✓ | ⚠ | ✓ | 2/3 | 🟡 部分 |
+| n11 | 猫白血病病毒会传染给家里其他猫吗 | ✓ | ✓ | ✓ | 3/3 | 🟢 稳 pass |
+| n12 | 听说猫传腹很致命，早期有什么信号 | ✓ | ✗ | ✓ | 2/3 | 🟡 部分 |
+| n13 | 狗从宠物店接回来以后一直咳嗽，像卡了… | ✗ | ✗ | ✗ | 0/3 | 🔴 稳 fail |
+| n14 | 猫口臭还流口水，牙龈看着发红 | ✓ | ✓ | ✓ | 3/3 | 🟢 稳 pass |
+| n15 | 十四岁的老猫半夜乱叫白天转圈，是老年… | ✗ | ✓ | ✗ | 1/3 | 🟡 部分 |
+| n16 | 猫突然不在猫砂盆里尿，到处乱尿 | ✓ | ✓ | ✓ | 3/3 | 🟢 稳 pass |
+| n17 | 帮我总结一下蛋蛋最近的健康状况 | ✗ | ✗ | ✗ | 0/3 | 🔴 稳 fail |
+| n18 | 蛋蛋上次打疫苗是什么时候 | ✓ | ✓ | ✓ | 3/3 | 🟢 稳 pass |
+| n19 | 多久给猫称一次体重比较合适 | ✓ | ✓ | ✓ | 3/3 | 🟢 稳 pass |
+| n20 | 每个月 1 号提醒我给蛋蛋体内驱虫 | ✓ | ✓ | ✓ | 3/3 | 🟢 稳 pass |
 
 ## 3. 不稳定 / 失败 case 详情
 
-### a08 (🟡 部分 pass, 2/3)
-- query: `我在北京海淀，帮我找附近 24 小时宠物急诊`
-- 期望: {"task": ["symptom", "chat"], "tools_required": ["find_nearby_clinic"], "final_contains": ["医院"]}
+### a01 (🟡 部分 pass, 2/3)
+- query: `我家猫昨晚吐了 3 次都是黄水，今天没什么精神`
+- 期望: {"task": ["symptom"], "tools_required": ["retrieve_vet_knowledge", "save_pet_event"], "final_contains": ["呕吐", "兽医"]}
+  - run 1 ✓: task=`symptom`  tools=`['retrieve_vet_knowledge', 'save_pet_event']`
+  - run 2 ✓: task=`symptom`  tools=`['retrieve_vet_knowledge', 'save_pet_event']`
+  - run 3 ✗: task=`symptom`  tools=`['retrieve_vet_knowledge', 'save_pet_event', 'retrieve_vet_knowledge']`
+    - 原因: final 缺 ['呕吐', '兽医']
+
+### a03 (🟡 部分 pass, 2/3)
+- query: `我家狗刚才误食了一整块巧克力，大概 30 分钟前`
+- 期望: {"task": ["symptom"], "tools_required": ["retrieve_vet_knowledge", "save_pet_event"], "final_contains": ["巧克力", "立即"]}
+  - run 1 ✓: task=`symptom`  tools=`['retrieve_vet_knowledge', 'save_pet_event']`
+  - run 2 ✗: task=`symptom`  tools=`['retrieve_vet_knowledge', 'save_pet_event', 'retrieve_vet_knowledge', 'retrieve_vet_knowledge', 'retrieve_vet_knowledge']`
+    - 原因: final 缺 ['巧克力', '立即']
+  - run 3 ✓: task=`symptom`  tools=`['retrieve_vet_knowledge', 'save_pet_event']`
+
+### a04 (🟡 部分 pass, 2/3)
+- query: `老猫得了慢性肾病早期会有什么症状`
+- 期望: {"task": ["symptom", "chat"], "tools_required": ["retrieve_vet_knowledge"], "final_contains": ["肾"]}
+  - run 1 ✗: task=`symptom`  tools=`[]`
+    - 原因: 漏调 ['retrieve_vet_knowledge']
+  - run 2 ✓: task=`symptom`  tools=`['retrieve_vet_knowledge']`
+  - run 3 ✓: task=`symptom`  tools=`['retrieve_vet_knowledge']`
+
+### a05 (🟡 部分 pass, 1/3)
+- query: `狗分离焦虑怎么治`
+- 期望: {"task": ["symptom", "chat"], "tools_required": ["retrieve_vet_knowledge"], "final_contains": ["焦虑"]}
   - run 1 ✗: task=`chat`  tools=`[]`
-    - 原因: 漏调 ['find_nearby_clinic']
-  - run 2 ✓: task=`chat`  tools=`['find_nearby_clinic']`
-  - run 3 ✓: task=`chat`  tools=`['find_nearby_clinic']`
+    - 原因: 漏调 ['retrieve_vet_knowledge']
+  - run 2 ✓: task=`chat`  tools=`['retrieve_vet_knowledge']`
+  - run 3 ✗: task=`chat`  tools=`[]`
+    - 原因: 漏调 ['retrieve_vet_knowledge']
+
+### a06 (🟡 部分 pass, 2/3)
+- query: `提醒我下周二上午 9 点给蛋蛋打猫三联，以后每年提醒一次`
+- 期望: {"task": ["chat"], "tools_required": ["schedule_reminder"], "final_contains": ["提醒"]}
+  - run 1 ✗: task=`chat`  tools=`['schedule_reminder', 'retrieve_vet_knowledge', 'save_pet_event']`
+    - 原因: final 缺 ['提醒']
+  - run 2 ✓: task=`chat`  tools=`['schedule_reminder']`
+  - run 3 ✓: task=`chat`  tools=`['schedule_reminder']`
+
+### a09 (🟡 部分 pass, 1/3)
+- query: `家附近哪里有宠物医院`
+- 期望: {"task": ["chat", "symptom"], "tools_forbidden": ["find_nearby_clinic"], "final_contains": ["地址", "位置", "具体", "城市", "哪里"]}
+  - run 1 ✓: task=`chat`  tools=`[]`
+  - run 2 ✗: task=`chat`  tools=`['find_nearby_clinic']`
+    - 原因: 误调 forbidden ['find_nearby_clinic']
+  - run 3 ✗: task=`chat`  tools=`[]`
+    - 原因: final 缺 ['地址', '位置', '具体', '城市', '哪里']
+
+### a10 (🟡 部分 pass, 2/3)
+- query: `我家猫今天好可爱啊`
+- 期望: {"task": ["chat"], "tools_forbidden": ["retrieve_vet_knowledge", "save_pet_event", "find_nearby_clinic", "schedule_reminder"], "final_contains": []}
+  - run 1 ✓: task=`chat`  tools=`[]`
+  - run 2 ✗: task=`chat`  tools=`['retrieve_vet_knowledge', 'save_pet_event']`
+    - 原因: 误调 forbidden ['retrieve_vet_knowledge', 'save_pet_event']
+  - run 3 ✓: task=`chat`  tools=`[]`
+
+### n06 (🟡 部分 pass, 2/3)
+- query: `每天能给狗吃多少零食不算过量`
+- 期望: {"task": ["chat", "symptom"], "tools_required": ["retrieve_vet_knowledge"], "final_contains": ["零食", "10", "热量"]}
+  - run 1 ✓: task=`chat`  tools=`['retrieve_vet_knowledge']`
+  - run 2 ✓: task=`chat`  tools=`['retrieve_vet_knowledge']`
+  - run 3: ⚠ ERROR `Request timed out.`
+
+### n07 (🟡 部分 pass, 1/3)
+- query: `老年猫的饮食需要注意什么`
+- 期望: {"task": ["chat", "symptom"], "tools_required": ["retrieve_vet_knowledge"], "final_contains": ["老年", "蛋白", "饮食"]}
+  - run 1: ⚠ ERROR `Request timed out.`
+  - run 2 ✓: task=`chat`  tools=`['retrieve_vet_knowledge']`
+  - run 3: ⚠ ERROR `Request timed out.`
+
+### n08 (🟡 部分 pass, 2/3)
+- query: `狗吃了几颗葡萄要紧吗`
+- 期望: {"task": ["symptom"], "tools_required": ["retrieve_vet_knowledge"], "final_contains": ["葡萄", "就医", "肾"]}
+  - run 1 ✗: task=`symptom`  tools=`[]`
+    - 原因: 漏调 ['retrieve_vet_knowledge']
+  - run 2 ✓: task=`symptom`  tools=`['retrieve_vet_knowledge', 'save_pet_event']`
+  - run 3 ✓: task=`symptom`  tools=`['retrieve_vet_knowledge', 'save_pet_event']`
+
+### n10 (🟡 部分 pass, 2/3)
+- query: `猫能吃洋葱吗，昨天猫偷舔了点洋葱炒肉的汤`
+- 期望: {"task": ["symptom"], "tools_required": ["retrieve_vet_knowledge"], "final_contains": ["洋葱", "溶血", "就医"]}
+  - run 1 ✓: task=`symptom`  tools=`['retrieve_vet_knowledge', 'save_pet_event']`
+  - run 2: ⚠ ERROR `Request timed out.`
+  - run 3 ✓: task=`symptom`  tools=`['retrieve_vet_knowledge', 'save_pet_event']`
+
+### n12 (🟡 部分 pass, 2/3)
+- query: `听说猫传腹很致命，早期有什么信号`
+- 期望: {"task": ["symptom", "chat"], "tools_required": ["retrieve_vet_knowledge"], "final_contains": ["传染性腹膜炎", "FIP", "发热", "腹水"]}
+  - run 1 ✓: task=`symptom`  tools=`['retrieve_vet_knowledge']`
+  - run 2 ✗: task=`symptom`  tools=`[]`
+    - 原因: 漏调 ['retrieve_vet_knowledge']; final 缺 ['传染性腹膜炎', 'FIP', '发热', '腹水']
+  - run 3 ✓: task=`symptom`  tools=`['retrieve_vet_knowledge']`
+
+### n15 (🟡 部分 pass, 1/3)
+- query: `十四岁的老猫半夜乱叫白天转圈，是老年痴呆吗`
+- 期望: {"task": ["symptom", "chat"], "tools_required": ["retrieve_vet_knowledge"], "final_contains": ["认知", "老年", "兽医"]}
+  - run 1 ✗: task=`chat`  tools=`[]`
+    - 原因: 漏调 ['retrieve_vet_knowledge']
+  - run 2 ✓: task=`chat`  tools=`['retrieve_vet_knowledge']`
+  - run 3 ✗: task=`chat`  tools=`[]`
+    - 原因: 漏调 ['retrieve_vet_knowledge']
+
+### n09 (🔴 稳定 fail, 0/3)
+- query: `狗偷吃了一片无糖口香糖会中毒吗`
+- 期望: {"task": ["symptom"], "tools_required": ["retrieve_vet_knowledge"], "final_contains": ["木糖醇", "就医", "低血糖"]}
+  - run 1 ✗: task=`symptom`  tools=`['retrieve_vet_knowledge', 'retrieve_vet_knowledge']`
+    - 原因: final 缺 ['木糖醇', '就医', '低血糖']
+  - run 2: ⚠ ERROR `Request timed out.`
+  - run 3 ✗: task=`symptom`  tools=`['retrieve_vet_knowledge']`
+    - 原因: final 缺 ['木糖醇', '就医', '低血糖']
+
+### n13 (🔴 稳定 fail, 0/3)
+- query: `狗从宠物店接回来以后一直咳嗽，像卡了东西一样`
+- 期望: {"task": ["symptom"], "tools_required": ["retrieve_vet_knowledge"], "final_contains": ["咳", "犬窝咳"]}
+  - run 1 ✗: task=`symptom`  tools=`[]`
+    - 原因: 漏调 ['retrieve_vet_knowledge']; final 缺 ['咳', '犬窝咳']
+  - run 2 ✗: task=`symptom`  tools=`[]`
+    - 原因: 漏调 ['retrieve_vet_knowledge']; final 缺 ['咳', '犬窝咳']
+  - run 3 ✗: task=`symptom`  tools=`[]`
+    - 原因: 漏调 ['retrieve_vet_knowledge']
+
+### n17 (🔴 稳定 fail, 0/3)
+- query: `帮我总结一下蛋蛋最近的健康状况`
+- 期望: {"task": ["chat", "symptom"], "tools_required": ["query_pet_history"], "final_contains": ["蛋蛋"]}
+  - run 1 ✗: task=`chat`  tools=`[]`
+    - 原因: 漏调 ['query_pet_history']
+  - run 2 ✗: task=`chat`  tools=`[]`
+    - 原因: 漏调 ['query_pet_history']
+  - run 3 ✗: task=`chat`  tools=`[]`
+    - 原因: 漏调 ['query_pet_history']
 
 ## 4. LLM 漏调率（症状类 3 case × N runs）
 
@@ -56,9 +201,9 @@
 
 ## 5. 结论与简历讲点
 
-- **总 run pass rate 97%**（29/30 runs）
-- **稳定 case 9/10**，部分 1/10，稳定 fail 0/10
-- **延迟**：中位 14.7s / 均值 15.0s
+- **总 run pass rate 71%**（64/90 runs）
+- **稳定 case 14/30**，部分 13/30，稳定 fail 3/30
+- **延迟**：中位 23.2s / 均值 24.0s
 - **核心发现**：
   - LLM 非确定性现象量化（partial cases 数量 = 不可重现的脆弱点）
   - 评测设计本身暴露 sync/stream 双轨实现差异 → V2 统一兜底
