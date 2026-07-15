@@ -388,8 +388,10 @@ def run_agent(
                             if verbose:
                                 print(f'[planner] empty final x{empty_streak}, forcing tool_choice=none')
                             messages.append({
-                                'role': 'system',
+                                'role': 'user',  # DeepInfra 的 Qwen 模板不吃对话中途 system/以 assistant 结尾——纠偏必须用 user 角色收尾
                                 'content': (
+                                    '（系统提示，主人看不到这条，直接照做）'
+                                    
                                     '你又输出了空内容。下一轮已禁用全部工具，'
                                     '请直接用纯文本写出完整 final 答复'
                                     '（基于已有的工具结果和上下文：结论 / 建议 / 下一步）。'
@@ -399,8 +401,10 @@ def run_agent(
                             if verbose:
                                 print('[planner] empty final detected, injecting retry hint')
                             messages.append({
-                                'role': 'system',
+                                'role': 'user',  # DeepInfra 的 Qwen 模板不吃对话中途 system/以 assistant 结尾——纠偏必须用 user 角色收尾
                                 'content': (
+                                    '（系统提示，主人看不到这条，直接照做）'
+                                    
                                     '注意：你上一条输出是**空内容**，主人会看到一个空气泡。'
                                     '请立即基于已有的工具结果和上下文，直接写出完整 final 答复'
                                     '（结论 / 分析 / 建议 / 下一步），不要输出空内容。'
@@ -413,8 +417,10 @@ def run_agent(
                     if verbose:
                         print(f'[planner] transition-only detected, injecting retry hint')
                     messages.append({
-                        'role': 'system',
+                        'role': 'user',  # DeepInfra 的 Qwen 模板不吃对话中途 system/以 assistant 结尾——纠偏必须用 user 角色收尾
                         'content': (
+                            '（系统提示，主人看不到这条，直接照做）'
+                            
                             '注意：你刚说要执行某个操作（如查知识库 / 记录事件），但**没有真的调 tool**。'
                             '请立即调用相应的 tool 真正执行——只说不做等于放弃任务。'
                         ),
@@ -1003,8 +1009,10 @@ async def run_agent_stream(
                             force_prose_next = True
                             print(f'[stream]   ∅ empty final ×{empty_streak} → next iter tool_choice=none', flush=True)
                             messages.append({
-                                'role': 'system',
+                                'role': 'user',  # DeepInfra 的 Qwen 模板不吃对话中途 system/以 assistant 结尾——纠偏必须用 user 角色收尾
                                 'content': (
+                                    '（系统提示，主人看不到这条，直接照做）'
+                                    
                                     '你又输出了空内容。下一轮已禁用全部工具，'
                                     '请直接用纯文本写出完整 final 答复'
                                     '（基于已有的工具结果和上下文：结论 / 建议 / 下一步）。'
@@ -1013,8 +1021,10 @@ async def run_agent_stream(
                         else:
                             print(f'[stream]   ∅ empty final, injecting retry hint', flush=True)
                             messages.append({
-                                'role': 'system',
+                                'role': 'user',  # DeepInfra 的 Qwen 模板不吃对话中途 system/以 assistant 结尾——纠偏必须用 user 角色收尾
                                 'content': (
+                                    '（系统提示，主人看不到这条，直接照做）'
+                                    
                                     '注意：你上一条输出是**空内容**，主人会看到一个空气泡。'
                                     '请立即基于已有的工具结果和上下文，直接写出完整 final 答复'
                                     '（结论 / 分析 / 建议 / 下一步），不要输出空内容。'
@@ -1040,8 +1050,10 @@ async def run_agent_stream(
                         is_intermediate=True,
                     )
                     messages.append({
-                        'role': 'system',
+                        'role': 'user',  # DeepInfra 的 Qwen 模板不吃对话中途 system/以 assistant 结尾——纠偏必须用 user 角色收尾
                         'content': (
+                            '（系统提示，主人看不到这条，直接照做）'
+                            
                             '你刚才写的是"已完成 X，来聊聊"这种过渡话，**不是完整答复**。'
                             '请现在直接给出完整 final——分析 / 可能原因 / 建议 / 阈值（如就医 24h）/ 家庭处理步骤等，'
                             '让主人看完就有可操作的信息。不要再写"来聊聊"这种开场白，直接给具体内容。'
@@ -1056,8 +1068,10 @@ async def run_agent_stream(
                     pending_motivation = final  # 暂存：下一轮真调 tool 时前端展示这句作 motivation
                     print(f'[stream]   ⟲ silent transition retry, pending_motivation={final[:60]!r}', flush=True)
                     messages.append({
-                        'role': 'system',
+                        'role': 'user',  # DeepInfra 的 Qwen 模板不吃对话中途 system/以 assistant 结尾——纠偏必须用 user 角色收尾
                         'content': (
+                            '（系统提示，主人看不到这条，直接照做）'
+                            
                             '注意：你刚说要执行某个操作（如查知识库 / 记录事件），但**没有真的调 tool**。'
                             '请立即调用相应的 tool 真正执行——只说不做等于放弃任务。'
                             '系统已把你这条 content 暂存当下一轮真调 tool 时的动作描述，'
