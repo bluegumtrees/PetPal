@@ -41,3 +41,4 @@ private/
 # 临时脚本输出
 scripts/_*
 .mcp.json
+eval/_failures_last_run.jsonl

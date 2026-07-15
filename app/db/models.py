@@ -94,6 +94,23 @@ class Reminder(SQLModel, table=True):
     created_at: datetime = Field(default_factory=_now)
 
 
+class PetHealthSummary(SQLModel, table=True):
+    """记忆 V2：滚动健康画像（docs/memory_v2_design.md）。
+
+    summary_text 由 LLM 增量归纳；facts_json 由确定性代码计算（可随时重算）。
+    events_covered 是水位线：生成时覆盖到的最大 event_id。
+    """
+    __tablename__ = 'pet_health_summaries'
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    pet_id: int = Field(..., foreign_key='pets.id', index=True, unique=True)
+    summary_text: Optional[str] = Field(default=None)
+    facts_json: str = Field(default='{}')
+    events_covered: int = Field(default=0)
+    generated_at: datetime = Field(default_factory=_now)
+    model: Optional[str] = Field(default=None, max_length=100)
+
+
 class ChatSession(SQLModel, table=True):
     """对话历史 + tool_calls 审计。
     表名是历史包袱（早期叫 session），每行实际是一条 message。

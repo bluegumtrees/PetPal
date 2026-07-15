@@ -28,25 +28,43 @@ from app.agent.planner import run_agent  # noqa: E402
 
 CASES_FILE = ROOT / 'eval' / 'agent_cases.yaml'
 REPORT_FILE = ROOT / 'eval' / 'report_agent.md'
+FAILURES_FILE = ROOT / 'eval' / '_failures_last_run.jsonl'  # 失败样本原文（验尸用，gitignore）
 N_RUNS = 3  # 每 case 跑几次
+
+_FAILURE_DUMPS: list[dict] = []
 
 
 def run_once(case: dict, pet_id: int) -> dict:
-    """跑一次 run_agent + 检查期望。返回单次 run 结果。"""
+    """跑一次 run_agent + 检查期望。返回单次 run 结果。
+
+    基础设施错误（超时/连接断）重试一次再计分——评测对象是 agent 行为，
+    不是本机到 OpenRouter 的网络天气。
+    """
     query = case['query']
     exp = case['expected']
 
     t0 = time.perf_counter()
-    try:
-        result = run_agent(query, pet_id=pet_id, image_path=None, max_iter=5, verbose=False)
-        elapsed = time.perf_counter() - t0
-    except Exception as e:
-        elapsed = time.perf_counter() - t0
+    result = None
+    last_err: str | None = None
+    for attempt in range(2):
+        try:
+            result = run_agent(query, pet_id=pet_id, image_path=None, max_iter=5, verbose=False)
+            break
+        except Exception as e:
+            last_err = str(e)
+            infra = any(k in last_err.lower() for k in ('timed out', 'timeout', 'connection'))
+            if infra and attempt == 0:
+                print('    (基础设施错误，5s 后重试一次)')
+                time.sleep(5)
+                continue
+            break
+    if result is None:
         return {
-            'error': str(e),
-            'elapsed_s': elapsed,
+            'error': last_err or 'unknown',
+            'elapsed_s': time.perf_counter() - t0,
             'pass': False,
         }
+    elapsed = time.perf_counter() - t0
 
     actual_tools = [tc['tool'] for tc in result['tool_calls']]
     actual_task = result['task']
@@ -105,6 +123,14 @@ def evaluate_case_multi(case: dict, pet_id: int, n_runs: int) -> dict:
         print(f'\n[{qid} run {i+1}/{n_runs}] {case["query"][:42]}...')
         r = run_once(case, pet_id)
         runs.append(r)
+        if not r.get('pass'):
+            _FAILURE_DUMPS.append({
+                'case': qid, 'run': i + 1, 'query': case['query'],
+                'task': r.get('actual_task'), 'tools': r.get('actual_tools'),
+                'error': r.get('error'),
+                'final': (r.get('final') or '')[:800],
+                'checks': r.get('checks'),
+            })
         if 'error' in r:
             print(f'  ERROR: {r["error"]}')
         else:
@@ -141,6 +167,13 @@ def main():
     print(f'predicted runtime: {len(cases) * N_RUNS * 7:.0f}-{len(cases) * N_RUNS * 15:.0f} sec\n')
 
     results = [evaluate_case_multi(c, pet_id, N_RUNS) for c in cases]
+
+    # 失败样本原文落盘（含 final 全文头 800 字），供逐案验尸
+    import json as _json
+    with open(FAILURES_FILE, 'w', encoding='utf-8') as f:
+        for d in _FAILURE_DUMPS:
+            f.write(_json.dumps(d, ensure_ascii=False) + '\n')
+    print(f'\n失败样本 {len(_FAILURE_DUMPS)} 条 → {FAILURES_FILE.name}')
 
     # 总计指标
     total_runs = sum(r['n_runs'] for r in results)
