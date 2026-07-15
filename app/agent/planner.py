@@ -45,6 +45,8 @@ def _get_client() -> OpenAI:
         _client = OpenAI(
             api_key=os.getenv('OPENROUTER_API_KEY'),
             base_url=os.getenv('OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1'),
+            timeout=90.0,     # 默认 600s 太久——评测/生产都别陪跑僵死请求
+            max_retries=2,    # SDK 只对连接错误/429/5xx 重试，空响应另有 planner 兜底
         )
     return _client
 
@@ -91,6 +93,7 @@ task = {task}
 # 工作基调
 
 1. **多查 RAG**——症状、行为、饮食建议等等，**哪怕你觉得已经知道答案**，先 `retrieve_vet_knowledge` 一次。基于 KB 比凭印象更可靠，主人也能看到你查了什么。
+   营养/喂食量/换粮/零食/禁忌食物这类"常识问题"也一样必须先查——知识库有专门的营养饮食区，里面有剂量红线和公式，凭印象答容易漏关键数字。
 
 2. **多记事件**——symptom一定要记，有价值的健康信息（bcs/疼痛/情绪/体重评估）一定要记、以及有趣事件和发现都可以 `save_pet_event`。主人翻时间线看记录，少了就没了。
    **更新事件**：主人对你**刚 save 过的事件**追加细节时（如刚 save "呕吐"，本轮发呕吐物图佐证），改用 `update_pet_event(event_id=N)` 追加而不是新建——避免时间线重复条目。
@@ -252,7 +255,7 @@ payload 合并到一个 dict，**不要拆多次调**。
 
 # 不要做的
 
-- **通常不要调 query_pet_history**——最近 5 条事件已在 system context 给你，除非用户明确问更早历史
+- **通常不要调 query_pet_history**——最近 5 条事件已在 system context 给你。**例外必须调**：主人问"上次 X 是什么时候 / 历史记录 / 过去的变化"而答案不在最近 5 条里（比如上次疫苗、几个月前的体重）——这时不调就等于瞎编
 - **不要重复**用相同参数调同一 tool
 - pet_id 用上方"宠物档案"里给的真实 ID，不要编造
 - **不要在确认型 tool（schedule_reminder / save_pet_event）成功一次后继续 emit 类似 tool_calls 反复"再确认"**——一次成功就够，下一轮立即 `tool_calls=[]` 收尾
