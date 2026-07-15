@@ -97,6 +97,10 @@ def classify_task(text: str, has_image: bool, recent_assistant_hint: str | None 
         task = data.get('task', 'chat')
         if task not in ('chat', 'symptom', 'emotion', 'bcs', 'pain_fgs'):
             return 'chat'
+        # 视觉评估任务（emotion/bcs/pain_fgs）没图跑不了 VLM——
+        # 纯文字的"焦虑/胖瘦/疼吗"类咨询降级为 chat 走 RAG 咨询路径
+        if task in ('emotion', 'bcs', 'pain_fgs') and not has_image:
+            return 'chat'
         return task
     except json.JSONDecodeError:
         return 'chat'

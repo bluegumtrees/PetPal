@@ -475,7 +475,16 @@ def _find_nearby_clinic(args: dict, ctx: dict) -> dict:
     if not amap_key:
         return {'ok': False, 'error': 'AMAP_KEY not configured'}
 
-    location_text = args['location']
+    location_text = (args.get('location') or '').strip()
+    # 位置护栏：主人没明说位置时 LLM 会自己编一个（实测编过"北京海淀中关村"）——
+    # 模糊/缺失位置直接拒绝，逼它回头问主人
+    _VAGUE = {'附近', '家附近', '我家附近', '附近的', '当前位置', '这里', '本地', '周边'}
+    if len(location_text) < 2 or location_text in _VAGUE:
+        return {
+            'ok': False,
+            'need_location': True,
+            'reason': '主人没有提供具体位置，不能猜测地点。请在 final 里直接询问主人所在的城市/区域（如"上海松江"），拿到后再调本工具。',
+        }
     emergency = args.get('emergency', False)
     radius = args.get('radius_meters', 3000)
 
