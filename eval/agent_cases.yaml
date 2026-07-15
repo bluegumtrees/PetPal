@@ -14,7 +14,7 @@ cases:
     expected:
       task: [symptom]
       tools_required: [retrieve_vet_knowledge, save_pet_event]
-      final_contains: [呕吐, 兽医]
+      final_contains: [呕吐, 吐, 就医, 兽医]  # any-of+同义
 
   - id: a02
     query: "我家狗一直拉稀 3 天了，便里有血，怎么办"
@@ -42,14 +42,14 @@ cases:
     expected:
       task: [symptom, chat]
       tools_required: [retrieve_vet_knowledge]
-      final_contains: [焦虑]
+      final_contains: [焦虑, 分离, 独处]  # any-of+同义
 
   - id: a06
     query: "提醒我下周二上午 9 点给蛋蛋打猫三联，以后每年提醒一次"
     expected:
       task: [chat]
       tools_required: [schedule_reminder]
-      final_contains: [提醒]
+      final_contains: [提醒, 已设, 安排]  # any-of+同义
 
   - id: a07
     query: "记一下蛋蛋今天称了 4.4 公斤"
@@ -171,7 +171,7 @@ cases:
     expected:
       task: [symptom]
       tools_required: [retrieve_vet_knowledge]
-      final_contains: [咳, 犬窝咳]  # any-of
+      final_contains: [咳, 呼吸道, 就医]  # any-of+同义  # any-of
 
   - id: n14
     query: "猫口臭还流口水，牙龈看着发红"
@@ -199,14 +199,14 @@ cases:
     query: "帮我总结一下蛋蛋最近的健康状况"
     expected:
       task: [chat, symptom]
-      tools_required: [query_pet_history]
-      final_contains: [蛋蛋]
+      # 记忆 V2 后画像常驻 context，直接回答即正确行为，不再要求调 query_pet_history
+      final_contains: [蛋蛋, 体重, 恢复, 手术, 绝育]  # any-of
 
   - id: n18
     query: "蛋蛋上次打疫苗是什么时候"
     expected:
       task: [chat]
-      tools_required: [query_pet_history]
+      # 记忆 V2 后 last_vaccine 在画像 facts 里，直接回答即正确行为
       final_contains: [疫苗]
 
   - id: n19

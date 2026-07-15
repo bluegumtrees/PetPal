@@ -31,7 +31,7 @@ sys.path.insert(0, str(ROOT))
 from sqlmodel import Session, select, delete  # noqa: E402
 
 from app.db.database import _engine, init_db  # noqa: E402
-from app.db.models import ChatSession, Pet, PetEvent, Reminder, User  # noqa: E402
+from app.db.models import ChatSession, Pet, PetEvent, PetHealthSummary, Reminder, User  # noqa: E402
 from app.auth.security import hash_password  # noqa: E402
 from app.services.email import build_reminder_email  # noqa: E402
 from app.api.reminders import _build_preview_subject  # noqa: E402
@@ -87,6 +87,11 @@ def main() -> None:
         msgs = s.exec(select(ChatSession).where(ChatSession.user_id == demo.id)).all()
         for m in msgs:
             s.delete(m)
+        # 记忆 V2 画像随宠物一起清（重建后由水位线/回填脚本再生，降级模板即时可用）
+        wipe_ids = set(old_ids) | {p['id'] for p in bundle['pets']}
+        if wipe_ids:
+            for row in s.exec(select(PetHealthSummary).where(PetHealthSummary.pet_id.in_(wipe_ids))).all():
+                s.delete(row)
         for p in old_pets:
             s.delete(p)
         s.commit()

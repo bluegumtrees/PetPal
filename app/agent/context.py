@@ -60,6 +60,12 @@ def build_pet_context(
         f'  - pet_id：{pet.id}（调 tool 时用这个 ID）',
     ]
 
+    # 记忆 V2：长期健康画像（LLM 摘要 → facts 模板降级 → 空串，永不阻塞）
+    from app.agent.memory import get_health_summary_block
+    summary_block = get_health_summary_block(pet_id, session)
+    if summary_block:
+        lines.append(summary_block)
+
     # 最近事件
     stmt = (
         select(PetEvent)

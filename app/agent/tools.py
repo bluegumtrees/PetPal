@@ -360,6 +360,11 @@ def _save_pet_event(args: dict, ctx: dict) -> dict:
     session.add(e)
     session.commit()
     session.refresh(e)
+
+    # 记忆 V2 水位线：新增事件过阈值 → 后台线程再生健康画像（不阻塞本轮）
+    from app.agent.memory import maybe_schedule_regen
+    maybe_schedule_regen(pet_id)
+
     return {
         'ok': True,
         'event_id': e.id,

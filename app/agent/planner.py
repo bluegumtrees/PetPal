@@ -38,6 +38,9 @@ ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 
 _client: Optional[OpenAI] = None
 
+# agent loop 采样温度：0.5=共情语气基线；评测对照可用 LLM_TEMPERATURE=0.3 降方差
+_TEMPERATURE = float(os.getenv('LLM_TEMPERATURE', '0.5'))
+
 
 def _get_client() -> OpenAI:
     global _client
@@ -343,7 +346,7 @@ def run_agent(
                 model=model,
                 messages=messages,
                 tools=TOOL_SCHEMAS,
-                temperature=0.5,
+                temperature=_TEMPERATURE,
                 max_tokens=1500,
             )
             if _provider_order():
@@ -951,7 +954,7 @@ async def run_agent_stream(
                     model=model,
                     messages=messages,
                     tools=TOOL_SCHEMAS,
-                    temperature=0.5,
+                    temperature=_TEMPERATURE,
                     max_tokens=1500,
                 )
                 if _provider_order():
