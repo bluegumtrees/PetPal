@@ -674,6 +674,28 @@
    "note": "主人报告约1小时前发生",
    "image_asset": null,
    "source": "agent"
+  },
+  {
+   "pet_id": 23,
+   "day": -1,
+   "time": "21:47",
+   "type": "note",
+   "payload": {},
+   "note": "主人反映蛋蛋吃了冻干后开始挑食，不愿吃主粮",
+   "image_asset": null,
+   "source": "agent"
+  },
+  {
+   "pet_id": 23,
+   "day": -1,
+   "time": "21:41",
+   "type": "feeding",
+   "payload": {
+    "description": "开始尝试新粮，偏好鸡肉冻干口味，进食积极"
+   },
+   "note": "主人反馈换新粮，爱吃鸡肉冻干",
+   "image_asset": null,
+   "source": "agent"
   }
  ],
  "reminders": [
@@ -748,6 +770,15 @@
    "message": "点点心丝虫预防药（犬心保）",
    "notified": false,
    "repeat_rule": "monthly"
+  },
+  {
+   "pet_id": 23,
+   "day": 2,
+   "time": "09:00",
+   "type": "other",
+   "message": "观察蛋蛋新粮过渡情况，挑食是否改善",
+   "notified": false,
+   "repeat_rule": null
   }
  ],
  "conversations": [
@@ -2850,6 +2881,265 @@
      "is_intermediate": false,
      "vlm_output": null,
      "created_at": "2026-07-14T15:54:17.409760"
+    }
+   ]
+  },
+  {
+   "id": "L1",
+   "pet_id": 23,
+   "day": -1,
+   "time": "21:40",
+   "session_id": "82875fec-d9f5-499e-8710-ad562ec47569",
+   "image_map": {},
+   "messages": [
+    {
+     "id": 1696,
+     "session_id": "82875fec-d9f5-499e-8710-ad562ec47569",
+     "pet_id": 23,
+     "role": "user",
+     "content": "今天给蛋蛋换了新粮，他很爱吃鸡肉冻干！",
+     "tool_calls": null,
+     "image_url": null,
+     "task": "chat",
+     "is_intermediate": false,
+     "vlm_output": null,
+     "created_at": "2026-07-15T03:38:40.798276"
+    },
+    {
+     "id": 1697,
+     "session_id": "82875fec-d9f5-499e-8710-ad562ec47569",
+     "pet_id": 23,
+     "role": "assistant",
+     "content": "听起来蛋蛋对新粮很感兴趣呢！鸡肉冻干确实香喷喷的，连我都忍不住想偷吃一口呢 🐾 不过新粮过渡要慢慢来哦，咱们得观察小家伙有没有软便或者不适应的情况。\n\n我先帮你把这次的饮食变化记下来，方便后续观察～\n",
+     "tool_calls": [
+      {
+       "tool": "save_pet_event",
+       "args": {
+        "pet_id": 23,
+        "event_type": "feeding",
+        "payload": {
+         "description": "开始尝试新粮，偏好鸡肉冻干口味，进食积极"
+        },
+        "note": "主人反馈换新粮，爱吃鸡肉冻干"
+       },
+       "result_summary": "keys=['ok', 'event_id', 'happened_at', 'weight_synced']",
+       "result": {
+        "ok": true,
+        "event_id": 395,
+        "happened_at": "2026-07-15T03:38:45.473536",
+        "weight_synced": false
+       }
+      }
+     ],
+     "image_url": null,
+     "task": "chat",
+     "is_intermediate": true,
+     "vlm_output": null,
+     "created_at": "2026-07-15T03:38:45.479790"
+    },
+    {
+     "id": 1698,
+     "session_id": "82875fec-d9f5-499e-8710-ad562ec47569",
+     "pet_id": 23,
+     "role": "assistant",
+     "content": "已成功记录蛋蛋的饮食小里程碑！🍗\n\n小家伙开始尝试新粮，还特别喜欢鸡肉冻干口味，进餐积极性很高～我会持续关注他的消化情况，记得这周称一下体重，看看有没有因为新口味变得太“幸福肥”哦 😸\n\n如果接下来有软便或食欲变化，随时告诉我，咱们一起调饮食方案～",
+     "tool_calls": null,
+     "image_url": null,
+     "task": "chat",
+     "is_intermediate": false,
+     "vlm_output": null,
+     "created_at": "2026-07-15T03:38:49.465429"
+    },
+    {
+     "id": 1699,
+     "session_id": "82875fec-d9f5-499e-8710-ad562ec47569",
+     "pet_id": 23,
+     "role": "user",
+     "content": "但蛋蛋吃了冻干以后有点挑食不吃猫粮了",
+     "tool_calls": null,
+     "image_url": null,
+     "task": "chat",
+     "is_intermediate": false,
+     "vlm_output": null,
+     "created_at": "2026-07-15T03:39:15.690204"
+    },
+    {
+     "id": 1700,
+     "session_id": "82875fec-d9f5-499e-8710-ad562ec47569",
+     "pet_id": 23,
+     "role": "assistant",
+     "content": "哎呀，这是典型的“零食惯坏”啦～蛋蛋这是尝过冻干的“人间美味”后，对普通猫粮开启高冷模式了 😼\n\n我先查查兽医知识库，看看怎么科学调整饮食、避免营养不均衡。\n",
+     "tool_calls": [
+      {
+       "tool": "retrieve_vet_knowledge",
+       "args": {
+        "query": "猫咪挑食 只吃零食 不吃主粮 怎么办",
+        "species": "cat"
+       },
+       "result_summary": "count=5, keys=['count', 'results']",
+       "result": {
+        "count": 5,
+        "results": [
+         {
+          "title": "症状-食欲-拒食一餐",
+          "body": "### 表现\n偶尔不吃一顿，但精神、饮水、排便正常。常见原因：天气炎热、零食吃多、轻度肠胃不适、母犬发情前后。\n\n### 家庭处理\n拿走食物 30 分钟后再尝试；不要靠加零食诱食（养成挑食）；保证饮水。\n\n### 何时就医\n- **狗**：连续不吃 > 24 小时（幼犬 > 12 小时）\n- **猫**：**连续不吃 > 24 小时必须就医**——猫禁食超过 2-3 天可发展为脂肪肝（肝脏脂肪沉积），死亡率高\n\n---",
+          "meta": {
+           "severity": "low",
+           "emergency": false,
+           "source": "Cornell Feline Health Center"
+          },
+          "score": 0.926
+         },
+         {
+          "title": "护理-换粮过渡",
+          "body": "### 7 天过渡法\n- 第 1-2 天：旧 75% + 新 25%\n- 第 3-4 天：旧 50% + 新 50%\n- 第 5-6 天：旧 25% + 新 75%\n- 第 7 天起：全新粮\n\n### 敏感个体可延长至 14 天\n出现软便/呕吐 → 退回上一比例稳定 3 天后再推进。\n\n### 注意\n**老年宠物、IBD/胰腺炎史的宠物换粮要更慢**。猫挑食可能拒新粮 → 不要强迫，混进湿粮诱食。\n\n---",
+          "meta": {
+           "severity": "low",
+           "emergency": false,
+           "source": "AAHA"
+          },
+          "score": 0.792
+         },
+         {
+          "title": "食物过敏-猫-饮食管理",
+          "body": "### 表现\n在食物排除试验中，猫可能对新的食物成分产生过敏反应。常见过敏源包括鱼、牛肉、鸡肉和奶制品。试验期间，猫只能食用指定的食物和零食。\n\n### 家庭处理\n避免强迫猫改变饮食，因为长时间食欲不振可能导致严重的肝损伤。试验饮食应持续最多3个月，观察症状是否改善。水解蛋白饮食是另一种选择，蛋白质被分解成小分子，减少过敏反应。\n\n### 何时就医\n如果在试验过程中症状复发或未改善，应立即联系兽医。确认食物过敏后，继续排除饮食直至症状消失，然后逐步重新引入之前食用的成分以确认过敏源。",
+          "meta": {
+           "severity": "medium",
+           "emergency": false,
+           "source": "MSD Veterinary Manual"
+          },
+          "score": 0.635
+         },
+         {
+          "title": "肝病-脂肪肝-症状与诊断",
+          "body": "### 表现\n脂肪肝是猫最常见的肝病，表现为食欲不振导致的显著体重减轻（超过体重的25%），呕吐、嗜睡、腹泻、黄疸或黏膜苍白、流涎过多、肝脏肿大、无法抬头、肠道活动减少等症状。\n\n### 家庭处理\n应避免突然改变饮食或引入压力源，如搬家或新宠物。注意观察猫的饮食情况，若出现食欲不振，应及时咨询兽医。\n\n### 何时就医\n若猫出现显著体重减轻或持续食欲不振，应尽快就医。早期诊断和治疗可显著改善预后。",
+          "meta": {
+           "severity": "high",
+           "emergency": false,
+           "source": "MSD Veterinary Manual"
+          },
+          "score": 0.502
+         },
+         {
+          "title": "行为-应激反应",
+          "body": "### 触发\n搬家、新成员（人/宠物）、装修、寄养、医院、雷雨/烟花。**猫对环境变化敏感度远超狗**。\n\n### 表现\n躲藏 > 24 小时 / 拒食 / 在砂盆外排泄 / 过度梳理 / 流口水 / 攻击性升高。\n\n### 缓解\n- **猫**：费洛蒙喷雾（Feliway）/ 预留独立逃避空间 / 不强行互动\n- **狗**：Adaptil 项圈 / 安全屋训练 / 雷暴专用减压衣（ThunderShirt）\n\n### 何时就医\n应激 > 1 周不缓解、合并拒食 → 防止猫脂肪肝；考虑短期抗焦虑药。\n\n---",
+          "meta": {
+           "severity": "medium",
+           "emergency": false,
+           "source": "International Cat Care"
+          },
+          "score": 0.217
+         }
+        ]
+       }
+      }
+     ],
+     "image_url": null,
+     "task": "chat",
+     "is_intermediate": true,
+     "vlm_output": null,
+     "created_at": "2026-07-15T03:39:33.497158"
+    },
+    {
+     "id": 1701,
+     "session_id": "82875fec-d9f5-499e-8710-ad562ec47569",
+     "pet_id": 23,
+     "role": "assistant",
+     "content": "我来把蛋蛋挑食这件事记下来，方便咱们后续观察调整～\n\n",
+     "tool_calls": [
+      {
+       "tool": "save_pet_event",
+       "args": {
+        "pet_id": 23,
+        "event_type": "note",
+        "payload": {},
+        "note": "主人反映蛋蛋吃了冻干后开始挑食，不愿吃主粮"
+       },
+       "result_summary": "keys=['ok', 'event_id', 'happened_at', 'weight_synced']",
+       "result": {
+        "ok": true,
+        "event_id": 396,
+        "happened_at": "2026-07-15T03:39:37.186966",
+        "weight_synced": false
+       }
+      }
+     ],
+     "image_url": null,
+     "task": "chat",
+     "is_intermediate": true,
+     "vlm_output": null,
+     "created_at": "2026-07-15T03:39:37.191776"
+    },
+    {
+     "id": 1702,
+     "session_id": "82875fec-d9f5-499e-8710-ad562ec47569",
+     "pet_id": 23,
+     "role": "assistant",
+     "content": "已为蛋蛋记下挑食小记一笔～📝\n\n根据兽医知识库，给咱们的挑食小王子几点建议：\n\n**1. 别用零食“惯坏”他**  \n冻干虽香，但不能当饭吃。现在蛋蛋是典型的“零食依赖”，吃多了自然看不上主粮。建议：\n- **每天冻干 ≤ 10% 日热量**（约 5-6 小块）\n- **把部分冻干拌进主粮**，逐步减少，让他接受“主餐味道”\n- **别追着喂**，定时定量，不吃就收走，下一顿再试\n\n**2. 猫是“习惯性”动物**  \n突然换粮易拒食，好在你已经在过渡了！继续用**7天换粮法**，如果他抗拒，试试：\n- 用他爱的冻干碎 **混进新粮**诱食\n- 换个**浅口食盆**（避免胡子痛）\n- 把粮分到 **2-3 个地方**，增加“狩猎”趣味\n\n**3. 警惕“不吃=危险”**  \n⚠️ 记住：**猫连续不吃超过 24 小时必须就医！**  \n长期拒食可能引发脂肪肝，很危险。如果三天后还是只吃冻干、不吃主粮，咱们就得考虑换种适口性更强的主粮试试。\n\n要不要我帮你设个“观察饮食”的提醒，3天后看看过渡进展？",
+     "tool_calls": null,
+     "image_url": null,
+     "task": "chat",
+     "is_intermediate": false,
+     "vlm_output": null,
+     "created_at": "2026-07-15T03:39:51.251335"
+    },
+    {
+     "id": 1703,
+     "session_id": "82875fec-d9f5-499e-8710-ad562ec47569",
+     "pet_id": 23,
+     "role": "user",
+     "content": "那你帮我设个提醒吧",
+     "tool_calls": null,
+     "image_url": null,
+     "task": "chat",
+     "is_intermediate": false,
+     "vlm_output": null,
+     "created_at": "2026-07-15T03:42:29.151552"
+    },
+    {
+     "id": 1704,
+     "session_id": "82875fec-d9f5-499e-8710-ad562ec47569",
+     "pet_id": 23,
+     "role": "assistant",
+     "content": "我来安排提醒，3天后看看蛋蛋的饮食过渡情况～ 📅\n",
+     "tool_calls": [
+      {
+       "tool": "schedule_reminder",
+       "args": {
+        "pet_id": 23,
+        "reminder_type": "other",
+        "scheduled_at_local": "2026-07-18T09:00:00",
+        "message": "观察蛋蛋新粮过渡情况，是否仍挑食"
+       },
+       "result_summary": "keys=['ok', 'reminder_id', 'pet_name', 'reminder_type', 'scheduled_at_local', 'repeat_rule']",
+       "result": {
+        "ok": true,
+        "reminder_id": 36,
+        "pet_name": "蛋蛋",
+        "reminder_type": "other",
+        "scheduled_at_local": "2026-07-18 09:00",
+        "repeat_rule": null
+       }
+      }
+     ],
+     "image_url": null,
+     "task": "chat",
+     "is_intermediate": true,
+     "vlm_output": null,
+     "created_at": "2026-07-15T03:42:33.854820"
+    },
+    {
+     "id": 1705,
+     "session_id": "82875fec-d9f5-499e-8710-ad562ec47569",
+     "pet_id": 23,
+     "role": "assistant",
+     "content": "已为蛋蛋设好提醒！⏰\n\n7月18日（周四）上午9:00，我会提醒你观察他新粮过渡的情况，看看是不是还在挑食～到时咱们再决定要不要调整策略！\n\n加油，铲屎官！咱们一起帮小馋猫回归正轨 🐾",
+     "tool_calls": null,
+     "image_url": null,
+     "task": "chat",
+     "is_intermediate": false,
+     "vlm_output": null,
+     "created_at": "2026-07-15T03:42:37.813466"
     }
    ]
   }
