@@ -40,7 +40,7 @@ FastAPI + StreamingResponse (SSE)  ── async generator + asyncio.to_thread
 - **真 Agent，不是 chatbot**：基于 OpenAI Function Calling 协议，LLM 自主决定调哪些工具、按什么顺序、调几次；每步 `tool_calls` 持久化可审计，前端卡片流可视化整个决策过程。
 - **临床量表 prompt 化** ⭐：FGS 的 5 个 Action Units（耳位 / 眼睑 / 口鼻 / 胡须 / 头位）× 0/1/2 评分编码为 VLM 输出 schema，输出 `total_score/10 + normalized` 并对照 0.39 临床阈值。
 - **多 task VLM**：症状 / 情绪 / 体态（WSAVA 9 分制）/ 疼痛 / 闲聊各有独立 prompt 与 Pydantic schema；情绪任务**不断言**，输出 `candidate_emotions + confidence` 并标注单图局限。
-- **三阶段检索 RAG**：稠密（BGE-small-zh + Chroma）+ 稀疏（BM25 + jieba）→ RRF 融合 → CrossEncoder 重排；知识库 257 条，带 `species / severity / emergency` 等 metadata 过滤。
+- **三阶段检索 RAG**：稠密（BGE-small-zh + Chroma）+ 稀疏（BM25 + jieba）→ RRF 融合 → CrossEncoder 重排；知识库 473 条，带 `species / severity / emergency` 等 metadata 过滤。
 - **MCP 标准接入**：兽医知识库检索封装为标准 MCP server（`mcp_server.py`），Claude Code / Claude Desktop / Cursor 等任意 MCP 客户端可直接调用（附 stdio 冒烟测试）。
 - **多模态长期跟踪**：Recharts 时序对比图（BCS / 体重 / FGS），多次拍照看趋势；体重四入口（档案 / 编辑 / 称重 / LLM 口述）统一到单一数据源。
 - **日程提醒**：APScheduler（UTC 调度 + 启动恢复策略）+ per-user SMTP 邮件，支持疫苗 / 驱虫 / 洗澡 / 体检等。
@@ -70,7 +70,7 @@ pet/
 │   ├── components/               #   卡片流组件 + v4/ 设计系统组件
 │   ├── context/                  #   Auth / Pet / Sidebar 全局状态
 │   └── hooks/                    #   useSession（per-pet 会话）/ useTheme（6 主题）
-├── data/vet_kb/                  # 257 条兽医知识库（15 个 md，YAML frontmatter）
+├── data/vet_kb/                  # 473 条兽医知识库（21 个 md，YAML frontmatter）
 ├── eval/                         # 评测：retriever + agent E2E（脚本 + 报告）
 ├── scripts/                      # ingest_kb / MSD 翻译 / smoke tests
 ├── Dockerfile.backend / Dockerfile.frontend / docker-compose.yml
@@ -92,10 +92,11 @@ pet/
 
 ## 知识库
 
-兽医知识库共 **257 条**，存于 `data/vet_kb/` 的 15 个 markdown（每条带 YAML frontmatter：`species / severity / age_group / emergency / tags / source / source_url`）：
+兽医知识库共 **473 条**，存于 `data/vet_kb/` 的 21 个 markdown（每条带 YAML frontmatter：`species / severity / age_group / emergency / tags / source / source_url`）：
 
-- **129 条手写骨架**：参考 PetMD / Cornell Feline Health Center 等权威来源，按系统分类（消化 / 呼吸 / 皮肤 / 眼耳 / 急救 / 行为等）。
-- **128 条 MSD 翻译**：来自 **Merck（默克）兽医手册**——全球兽医百科金标准，GPT-4o 辅助翻译 + 人工 review，急诊红线条目逐字保留。
+- **133 条手写骨架**：参考 PetMD / AAHA / WSAVA 等权威指南，按系统分类（消化 / 呼吸 / 皮肤 / 眼耳 / 急救 / 行为 / 营养减重等）。
+- **293 条 MSD 翻译**：来自 **Merck（默克）兽医手册**——全球兽医百科金标准，覆盖慢性病 / 传染病 / 幼宠抚育 / 营养 / 繁育，GPT-4o 辅助翻译 + 人工 review，急诊红线条目逐字保留。
+- **47 条 Cornell 翻译**：康奈尔猫科健康中心——喂养营养 / 饮水 / 老年关怀 / 行为问题专题。
 
 每条切分为一个二级标题块（约 200–400 字，中文 RAG 的较优 chunk 长度）。
 

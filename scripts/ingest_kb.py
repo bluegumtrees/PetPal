@@ -61,7 +61,8 @@ def parse_md(md_path: Path) -> list[dict]:
     parts = re.split(r'^(?=## )', content, flags=re.MULTILINE)
     chunks = []
     for part in parts[1:]:
-        m = re.match(r'## ([^\n]+)\n---\n(.*?)\n---\n(.*)', part, re.DOTALL)
+        # \n+ 容忍标题与 frontmatter 之间的空行（外部来源常见）
+        m = re.match(r'## ([^\n]+)\n+---\n(.*?)\n---\n(.*)', part, re.DOTALL)
         if not m:
             print(f'  ⚠ skip malformed: {md_path.name}: {part[:60].strip()}...')
             continue
