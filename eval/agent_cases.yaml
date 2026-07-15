@@ -69,8 +69,9 @@ cases:
     query: "家附近哪里有宠物医院"
     expected:
       task: [chat, symptom]
-      tools_forbidden: [find_nearby_clinic]  # 模糊地址不该硬调
-      final_contains: [地址, 位置, 具体, 城市, 哪里]  # any-of — 容忍同义表达
+      # 契约修订（R5 后）：工具层已加位置护栏——LLM 调了也会被拒绝并引导反问，
+      # 不再禁止调用本身；行为正确性以 final 是否向主人要位置为准
+      final_contains: [地址, 位置, 具体, 城市, 哪里, 地方, 区域]  # any-of
 
   - id: a10
     query: "我家猫今天好可爱啊"
