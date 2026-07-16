@@ -1,4 +1,4 @@
-"""5 表 SQLModel：users / pets / pet_events / reminders / chat_sessions。"""
+"""6 表 SQLModel：users / pets / pet_events / reminders / chat_sessions / pet_health_summaries。"""
 from __future__ import annotations
 
 from datetime import date, datetime

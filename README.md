@@ -4,7 +4,7 @@
 
 其中一个核心设计是把同行评议的临床疼痛量表 **FGS（Feline Grimace Scale, Evangelista et al. 2019, *Scientific Reports*）prompt 化**为 VLM 的结构化输出 schema，让通用视觉模型输出医学级的疼痛评估。
 
-🔗 **在线 Demo**：http://114.55.95.6/ （阿里云 ECS，Docker Compose 部署；可注册或用试用账号直接体验）
+🔗 **在线 Demo**：http://114.55.95.6/ —— [一键进入演示账号](http://114.55.95.6/login?demo=1)（黄金演示数据：两只宠物半年健康档案 + 14 条真实 agent 会话，`scripts/seed_demo.py` 随时一键重置）
 
 ---
 
@@ -19,7 +19,7 @@ FastAPI + StreamingResponse (SSE)  ── async generator + asyncio.to_thread
         │
   ① 路由     classify_task(text, has_image)  → symptom / bcs / pain_fgs / emotion / chat
   ② VLM      按 task 选 prompt（FGS 5-AU schema 等）→ Pydantic 校验 + 失败重试
-  ③ Context  注入宠物档案 + 最近 5 条事件 + VLM 输出
+  ③ Context  注入宠物档案 + 长期健康画像（记忆 V2）+ 最近 5 条事件 + VLM 输出
   ④ Agent loop (max_iter=7)
         │   LLM(messages, tools) → tool_calls → 执行 → 结果回灌 → 循环
         │   ├─ retrieve_vet_knowledge   兽医 RAG（三阶段检索）
@@ -32,7 +32,7 @@ FastAPI + StreamingResponse (SSE)  ── async generator + asyncio.to_thread
         │
         ▼
 检索 (Chroma 向量 + BM25/jieba → RRF → CrossEncoder rerank)
-持久化 (SQLModel + SQLite，5 表) · 高德 Web API · SMTP / APScheduler
+持久化 (SQLModel + SQLite，6 表) · 高德 Web API · SMTP / APScheduler
 ```
 
 ## 核心特性
@@ -43,6 +43,7 @@ FastAPI + StreamingResponse (SSE)  ── async generator + asyncio.to_thread
 - **三阶段检索 RAG**：稠密（BGE-small-zh + Chroma）+ 稀疏（BM25 + jieba）→ RRF 融合 → CrossEncoder 重排；知识库 473 条，带 `species / severity / emergency` 等 metadata 过滤。
 - **MCP 标准接入**：兽医知识库检索封装为标准 MCP server（`mcp_server.py`），Claude Code / Claude Desktop / Cursor 等任意 MCP 客户端可直接调用（附 stdio 冒烟测试）。
 - **多模态长期跟踪**：Recharts 时序对比图（BCS / 体重 / FGS），多次拍照看趋势；体重四入口（档案 / 编辑 / 称重 / LLM 口述）统一到单一数据源。
+- **分层记忆（记忆 V2）** ⭐：`pet_health_summaries` 滚动健康画像——关键事实由代码确定性计算（体重趋势 / 上次疫苗驱虫 / 近 30 天关注点），叙事由 LLM 增量归纳（事件水位线触发后台再生），~300 token 常驻注入 context，三层降级永不阻塞聊天。agent 把画像当索引自主决定往哪个时间窗挖细节——记忆不是替代工具，是让工具调用变聪明。
 - **日程提醒**：APScheduler（UTC 调度 + 启动恢复策略）+ per-user SMTP 邮件，支持疫苗 / 驱虫 / 洗澡 / 体检等。
 - **账号体系**：JWT 鉴权 + bcrypt，多用户数据隔离，多宠物切换 + 软删。
 - **流式体验**：SSE 12+ 事件类型，前端 `fetch + ReadableStream` 手动解析（EventSource 不支持 multipart 上传）。
@@ -59,11 +60,12 @@ pet/
 │   │   ├── tools.py              #   7 个 Function Calling tool schema + dispatch
 │   │   ├── router.py             #   5 task 文本路由（含多轮上下文继承）
 │   │   ├── vlm.py                #   VLM 5 task prompt + Pydantic schema（含 FGS）
-│   │   └── context.py            #   宠物档案 + 最近事件注入 system prompt
+│   │   ├── context.py            #   宠物档案 + 画像 + 最近事件注入 system prompt
+│   │   └── memory.py             #   ★ 记忆 V2：滚动健康画像（facts 确定性计算 + LLM 增量归纳）
 │   ├── rag/retriever.py          # 三阶段检索：dense + sparse → RRF → rerank
 │   ├── auth/                     # JWT 鉴权（security / deps）
 │   ├── services/                 # APScheduler 提醒 + SMTP 邮件
-│   ├── db/                       # SQLModel 5 表（users/pets/events/reminders/chat_sessions）
+│   ├── db/                       # SQLModel 6 表（users/pets/events/reminders/chat_sessions/health_summaries）
 │   └── api/                      # REST 路由（agent/pets/events/reminders/sessions/auth/vet）
 ├── web/src/                      # 前端 React 19
 │   ├── pages/                    #   Chat / Dashboard / PetList / PetDetail / Login ...
@@ -71,8 +73,9 @@ pet/
 │   ├── context/                  #   Auth / Pet / Sidebar 全局状态
 │   └── hooks/                    #   useSession（per-pet 会话）/ useTheme（6 主题）
 ├── data/vet_kb/                  # 473 条兽医知识库（21 个 md，YAML frontmatter）
-├── eval/                         # 评测：retriever + agent E2E（脚本 + 报告）
-├── scripts/                      # ingest_kb / MSD 翻译 / smoke tests
+├── eval/                         # 评测：retriever + agent E2E（脚本 + 报告 + 迭代史）
+├── docs/                         # 设计文档（memory_v2_design 等）
+├── scripts/                      # ingest_kb / MSD 翻译 / seed_demo 黄金账号重置 / smoke tests
 ├── Dockerfile.backend / Dockerfile.frontend / docker-compose.yml
 ├── nginx.conf                    # 前端容器反代 /api → backend
 └── DEPLOY.md                     # 阿里云 ECS 部署手册
@@ -142,8 +145,9 @@ python -m eval.eval_agent         # Agent 端到端（多 case × 多 run）
 
 ### 主要结果
 
-- **检索器**（32 query × 4 配置）：`hybrid + rerank` **hit@5 96.7% / hit@1 86.7%**；重排单独贡献 +27% hit@1。OOK（库外问题）top-1 相似度显著低于库内（0.347 vs 0.979），可作 agent 判断"无相关知识"的信号。
-- **Agent 端到端**（10 case × 3 run = 30）：经 6 轮"评测 → 诊断 → 修复"迭代，pass rate 从 40% → **96.7%**；中位延迟 ~14.7s（含 VLM + RAG + 多轮 tool）。
+- **检索器**（32 query × 4 配置，473 条库）：`hybrid + rerank` **hit@5 93.3% / hit@1 83.3%**——扩库近一倍后原库条目 hit@5 保持 100% 不退化（新增营养库 90%）。OOK（库外问题）top-1 相似度仍显著低于库内（0.639 vs 0.987），可作 agent 判断"无相关知识"的信号。
+- **Agent 端到端**（30 case × 3 run = 90，多轮稳定性协议）：经六轮"评测 → 诊断 → 修复"迭代，pass rate 从 38.9% → **86.7%**（稳定通过 23/30，task 路由与工具红线双 100%，中位延迟 ~28s）。其中一次迭代定位到某推理供应商聊天模板对消息角色顺序的隐性要求——完整侦破过程与逐轮归因见 [`eval/iteration_history.md`](./eval/iteration_history.md)。
+  （前代 10 case 套件曾达 96.7%；30 case 版补充营养咨询 / 记忆召回 / 工具红线 / OOK 拒答等更难场景。）
 
 ## MCP Server
 
@@ -193,6 +197,8 @@ curl http://localhost/api/health
 - **Context Engineering > Tool Engineering**：把宠物档案 + 最近事件直接注入 system prompt，减少 agent 反复调 `query_pet_history`。
 - **不依赖 LLM 完全听话**：关键行为用工程兜底——`save_pet_event` 去重、RAG 单轮限次、"光说不做"检测重试、`pending_motivation` 补帧（适配 Qwen3 把动作描述与 tool_calls 拆两步输出的行为模式）。
 - **emotion 任务诚实标注局限**：单张静态图无法判断动态信号（尾巴抽打 / 呼吸节奏），故输出候选情绪 + 置信度而非断言。
+- **LLM 应用的故障面不只在模型和 prompt，还在聊天模板层**：迁移 Qwen 后出现"时好时坏"的空回复，逐层排查（工程兜底 → provider 锁定 → 逐轮埋点 finish_reason/provider → 三变体对照实验）后定位：某供应商的聊天模板要求对话以 user/tool 消息收尾，而所有纠偏重试恰好都以 system 消息结尾——"需要抢救的轮次必死"。7 处纠偏改 user 角色后根治，评测从 38.9% 跳回正轨（完整过程见 `eval/iteration_history.md`）。
+- **记忆是分层压缩，不是塞更多消息**：facts 由代码算（可审计可再生）、叙事由 LLM 写（增量归纳）、注入开销恒定与事件总量解耦；评测中"总结健康状况"类 case 由 0/3 → 3/3，还意外让 agent 学会用画像当索引做精准分窗查询。
 
 ## License
 
