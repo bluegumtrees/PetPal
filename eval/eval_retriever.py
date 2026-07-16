@@ -178,7 +178,11 @@ def main():
     lines.append('# PetPal Retriever 评测报告（P7）')
     lines.append('')
     lines.append(f'- 测试集：{len(queries)} 条（{sum(1 for q in queries if q["gt"])} in-KB + {sum(1 for q in queries if not q["gt"])} OOK）')
-    lines.append(f'- KB 规模：257 chunks（11 原文件 + 4 新文件）')
+    try:
+        _kb_size = get_retriever()._col.count()  # 动态计数，扩库后报告头不再说谎
+    except Exception:
+        _kb_size = '?'
+    lines.append(f'- KB 规模：{_kb_size} chunks（data/vet_kb/ 全量灌库）')
     lines.append(f'- top_k: {TOP_K}, fuse_n: {FUSE_N}')
     lines.append(f'- hit@k 用 any-of-gt 算（top-k 内出现任一 GT → hit）')
     lines.append('')
