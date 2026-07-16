@@ -1,7 +1,7 @@
 # PetPal Retriever 评测报告（P7）
 
 - 测试集：32 条（30 in-KB + 2 OOK）
-- KB 规模：257 chunks（11 原文件 + 4 新文件）
+- KB 规模：473 chunks（data/vet_kb/ 全量灌库）
 - top_k: 5, fuse_n: 20
 - hit@k 用 any-of-gt 算（top-k 内出现任一 GT → hit）
 
