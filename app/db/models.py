@@ -80,7 +80,7 @@ class Reminder(SQLModel, table=True):
     reminder_type: str = Field(..., max_length=30)
     # 'vaccine' / 'deworm' / 'bath' / 'medication' / 'checkup' / 'other'
     scheduled_at: datetime = Field(..., index=True)  # naive UTC
-    repeat_rule: Optional[str] = Field(default=None, max_length=50)  # 'monthly' / 'yearly' / 'every:90d' (MVP 只显示)
+    repeat_rule: Optional[str] = Field(default=None, max_length=50)  # 'monthly' / 'yearly' / 'every:90d'——触发后 scheduler 自动滚动生成下一次
     message: str = Field(..., max_length=500)
     notified: bool = Field(default=False, index=True)
     notification_channel: Optional[str] = Field(default=None, max_length=20)

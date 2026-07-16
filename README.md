@@ -44,7 +44,7 @@ FastAPI + StreamingResponse (SSE)  ── async generator + asyncio.to_thread
 - **MCP 标准接入**：兽医知识库检索封装为标准 MCP server（`mcp_server.py`），Claude Code / Claude Desktop / Cursor 等任意 MCP 客户端可直接调用（附 stdio 冒烟测试）。
 - **多模态长期跟踪**：Recharts 时序对比图（BCS / 体重 / FGS），多次拍照看趋势；体重四入口（档案 / 编辑 / 称重 / LLM 口述）统一到单一数据源。
 - **分层记忆（记忆 V2）** ⭐：`pet_health_summaries` 滚动健康画像——关键事实由代码确定性计算（体重趋势 / 上次疫苗驱虫 / 近 30 天关注点），叙事由 LLM 增量归纳（事件水位线触发后台再生），~300 token 常驻注入 context，三层降级永不阻塞聊天。agent 把画像当索引自主决定往哪个时间窗挖细节——记忆不是替代工具，是让工具调用变聪明。
-- **日程提醒**：APScheduler（UTC 调度 + 启动恢复策略）+ per-user SMTP 邮件，支持疫苗 / 驱虫 / 洗澡 / 体检等。
+- **日程提醒**：APScheduler（UTC 调度 + 启动恢复策略）+ per-user SMTP 邮件，支持疫苗 / 驱虫 / 洗澡 / 体检等；`repeat_rule` 真重复——触发后自动滚动生成下一次，停机跨期自动追赶到未来时点（月末/闰年日期钳制）。
 - **账号体系**：JWT 鉴权 + bcrypt，多用户数据隔离，多宠物切换 + 软删。
 - **流式体验**：SSE 12+ 事件类型，前端 `fetch + ReadableStream` 手动解析（EventSource 不支持 multipart 上传）。
 - **V4 设计系统**：6 主题（饼干 / 珊瑚 / 薄荷 / 浆果 / 单色 / 暗色），基于 **OKLCH 色彩空间** 保证主题切换的感知一致性；移动端响应式抽屉。

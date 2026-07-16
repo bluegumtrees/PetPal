@@ -50,6 +50,85 @@ def _format_local(naive_utc: datetime) -> str:
     return local.strftime('%Y-%m-%d %H:%M')
 
 
+# === 重复提醒滚动 ===
+
+def _next_occurrence(scheduled_at: datetime, repeat_rule: str, now: datetime) -> Optional[datetime]:
+    """按 repeat_rule 算下一次时间（naive UTC）。
+
+    支持 'yearly' / 'monthly' / 'every:Nd'；未知规则返回 None。
+    宕机追赶：循环推进直到落在未来（一年停机的 monthly 不会补发 12 条，直接跳到下个未来点）。
+    月末钳制：1/31 的 monthly → 2/28（29），日期不存在取当月最后一天。
+    """
+    def _add_months(dt: datetime, n: int) -> datetime:
+        y, m = dt.year + (dt.month - 1 + n) // 12, (dt.month - 1 + n) % 12 + 1
+        # 当月天数钳制
+        if m == 12:
+            month_days = 31
+        else:
+            month_days = (datetime(y, m + 1, 1) - timedelta(days=1)).day
+        return dt.replace(year=y, month=m, day=min(dt.day, month_days))
+
+    rule = (repeat_rule or '').strip().lower()
+    nxt = scheduled_at
+    for _ in range(500):  # 安全上限
+        if rule == 'yearly':
+            nxt = _add_months(nxt, 12)
+        elif rule == 'monthly':
+            nxt = _add_months(nxt, 1)
+        elif rule.startswith('every:') and rule.endswith('d'):
+            try:
+                days = int(rule[len('every:'):-1])
+            except ValueError:
+                return None
+            if days <= 0:
+                return None
+            nxt = nxt + timedelta(days=days)
+        else:
+            return None
+        if nxt > now:
+            return nxt
+    return None
+
+
+def _roll_repeat(r: Reminder, session: Session) -> Optional[int]:
+    """reminder 到达终态（notified=True）后，按 repeat_rule 生成下一次。
+
+    返回新 reminder id（无重复规则/已有未触发的同款排程时返回 None）。
+    在调用方的 session/commit 里完成，保证与终态更新原子。
+    """
+    if not r.repeat_rule:
+        return None
+    now = _utc_now_naive()
+    nxt = _next_occurrence(r.scheduled_at, r.repeat_rule, now)
+    if nxt is None:
+        return None
+    # 幂等护栏：同 pet 同类型同文案已有未触发的未来排程 → 不再生成
+    dup = session.exec(
+        select(Reminder).where(
+            Reminder.pet_id == r.pet_id,
+            Reminder.reminder_type == r.reminder_type,
+            Reminder.message == r.message,
+            Reminder.notified == False,  # noqa: E712
+        )
+    ).first()
+    if dup is not None:
+        return None
+    new = Reminder(
+        pet_id=r.pet_id,
+        reminder_type=r.reminder_type,
+        scheduled_at=nxt,
+        message=r.message,
+        repeat_rule=r.repeat_rule,
+        preview_subject=r.preview_subject,
+    )
+    session.add(new)
+    session.flush()  # 拿 id
+    add_reminder_job(new.id, nxt)
+    log.info('[scheduler] rolled repeat reminder %s -> %s at %s (%s)',
+             r.id, new.id, nxt.isoformat(), r.repeat_rule)
+    return new.id
+
+
 # === 核心触发逻辑 ===
 
 async def trigger_reminder(reminder_id: int, delayed_reason: Optional[str] = None) -> None:
@@ -90,6 +169,7 @@ async def trigger_reminder(reminder_id: int, delayed_reason: Optional[str] = Non
         if delayed_reason:
             r.delayed_reason = delayed_reason
         session.add(r)
+        _roll_repeat(r, session)  # 真重复：触发后滚动生成下一次
         session.commit()
         log.info('[scheduler] triggered reminder %s channel=%s', reminder_id, result['channel'])
 
@@ -163,6 +243,7 @@ def _restore_pending_jobs() -> dict:
                     'sent_at_utc': now.isoformat(),
                 }, ensure_ascii=False)
                 session.add(r)
+                _roll_repeat(r, session)  # 过期跳过也要滚动——重复链条不因停机断掉
                 counts['staled'] += 1
             elif r.scheduled_at < now:
                 # 过期 <1h → schedule 5 秒后立即触发（走 trigger_reminder 标准路径）
