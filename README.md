@@ -1,6 +1,6 @@
 # 🐾 PetPal 智能宠物管家
 
-![Python](https://img.shields.io/badge/Python-3.12-3776ab) ![React](https://img.shields.io/badge/React-19-61dafb) ![License](https://img.shields.io/badge/License-MIT-green) [![Demo](https://img.shields.io/badge/Demo-%E5%9C%A8%E7%BA%BF%E4%BD%93%E9%AA%8C-e8a34f)](http://114.55.95.6/login?demo=1)
+![Python](https://img.shields.io/badge/Python-3.12-3776ab) ![React](https://img.shields.io/badge/React-19-61dafb) ![License](https://img.shields.io/badge/License-MIT-green) [![Demo](https://img.shields.io/badge/Demo-%E5%9C%A8%E7%BA%BF%E4%BD%93%E9%AA%8C-e8a34f)](https://petpal-ai.top/login?demo=1)
 
 宠物主人拍张照片或者说句话，PetPal 识别症状、评估体态、判断疼痛、解读情绪，需要时查兽医知识库、找附近医院、设日程提醒，并把每次发现记进这只宠物自己的健康时间线。多只宠物、长期跟踪。
 
@@ -8,7 +8,7 @@
 
 其中一个核心设计：把发表在 *Scientific Reports* 的猫科疼痛量表 FGS（Evangelista et al. 2019）改写成 VLM 的结构化输出 schema，5 个面部动作单元逐项打分、对照 0.39 临床阈值，让通用视觉模型输出有依据、可解释的疼痛评估。
 
-🔗 在线 Demo：http://114.55.95.6/ ，或[一键进入演示账号](http://114.55.95.6/login?demo=1)（两只宠物半年健康档案 + 14 条真实 agent 会话，`scripts/seed_demo.py` 随时一键重置）
+🔗 在线 Demo：https://petpal-ai.top/ ，或[一键进入演示账号](https://petpal-ai.top/login?demo=1)（两只宠物半年健康档案 + 14 条真实 agent 会话，`scripts/seed_demo.py` 随时一键重置）
 
 <!-- TODO: 招牌流程 GIF 放这里（建议 40s：打开呕吐多轮会话看工具卡片流，切趋势页点 FGS 康复曲线弹出原图；ScreenToGif 录制，900px 宽，10MB 内） -->
 

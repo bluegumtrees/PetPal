@@ -1,0 +1,18 @@
+# Caddy 做最外层入口：自动申请 / 续期 Let's Encrypt 证书，HTTP 自动跳 HTTPS。
+# 内层还是原来的 nginx 容器（静态文件 + /api 反代），Caddy 只负责 TLS 终结。
+# 海外机房不需要备案，域名 A 记录指到服务器公网 IP 后起容器即可。
+
+petpal-ai.top, www.petpal-ai.top {
+    encode gzip
+    reverse_proxy frontend:80 {
+        # SSE 流式：禁用缓冲，首 token 立即推给浏览器（chat 可能 30s+）
+        flush_interval -1
+    }
+}
+
+# 纯 IP 访问保留 HTTP（旧链接 / 简历二维码过渡期用）
+http://64.110.98.249 {
+    reverse_proxy frontend:80 {
+        flush_interval -1
+    }
+}

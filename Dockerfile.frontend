@@ -1,11 +1,14 @@
 # 多阶段构建：node 构建 → nginx 托管 dist
 FROM node:22-alpine AS builder
 
+# 国内机房在 .env 里设 NPM_REGISTRY=https://registry.npmmirror.com
+ARG NPM_REGISTRY=https://registry.npmjs.org
+
 WORKDIR /web
 
 # pnpm 缓存优化
 COPY web/package.json web/pnpm-lock.yaml ./
-RUN corepack enable && pnpm install --frozen-lockfile --registry=https://registry.npmmirror.com
+RUN corepack enable && pnpm install --frozen-lockfile --registry=${NPM_REGISTRY}
 
 COPY web/ ./
 RUN pnpm build

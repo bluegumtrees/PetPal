@@ -3,14 +3,23 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.backend
+      args:
+        # 下面这些从同目录 .env 读；不设就走官方源（海外机房）。国内机房见 DEPLOY.md
+        APT_MIRROR: ${APT_MIRROR:-}
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
+        TORCH_INDEX_URL: ${TORCH_INDEX_URL:-https://download.pytorch.org/whl/cpu}
+        HF_ENDPOINT: ${HF_ENDPOINT:-https://huggingface.co}
     container_name: petpal-backend
     expose:
       - "8000"
     env_file: .env
     environment:
       - PETPAL_DEV_MODE=0   # 生产关掉 dev trigger_now
-      - HF_HUB_OFFLINE=1    # 强制 HF 库用本地 cache，不联网 check（ECS 上 hf-mirror 不稳）
-      - TRANSFORMERS_OFFLINE=1  # 老版本 transformers 走这个 env var
+      - HF_ENDPOINT=${HF_ENDPOINT:-https://huggingface.co}
+      # 首次启动要联网下 BGE 模型，所以默认在线；模型进了宿主 cache 之后
+      # 可在 .env 设 HF_HUB_OFFLINE=1 强制离线（国内 hf-mirror 不稳时用）
+      - HF_HUB_OFFLINE=${HF_HUB_OFFLINE:-0}
+      - TRANSFORMERS_OFFLINE=${HF_HUB_OFFLINE:-0}
     volumes:
       - ./data:/app/data  # 整个 data 目录持久化（含 vet_kb + uploads + petpal.db + chroma）
       - /root/.cache/huggingface:/root/.cache/huggingface  # RAG 模型（BGE embed/rerank）从宿主挂入，避免容器内重下
@@ -26,10 +35,31 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
+      args:
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org}
     container_name: petpal-frontend
-    ports:
-      - "80:80"   # 备案前用 :80；备案后可改 nginx 加 :443 + SSL
+    expose:
+      - "80"      # 只对 caddy 开放；对外的 80/443 由 caddy 接
     depends_on:
       backend:
         condition: service_healthy
     restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: petpal-caddy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data      # 证书和 ACME 账号，别删
+      - caddy_config:/config
+    depends_on:
+      - frontend
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:

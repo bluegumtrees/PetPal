@@ -1,5 +1,8 @@
 # PetPal 部署到阿里云 ECS（学生算力包）
 
+> 2026-10 起生产环境已迁到 Oracle Cloud 大阪免费 ARM 机，见 [DEPLOY_ORACLE.md](DEPLOY_ORACLE.md)。
+> 本文保留国内机房的完整流程；国内构建记得在 `.env` 里打开镜像源变量（见 `.env.example` 末尾）。
+
 ## 准备
 
 阿里云 ECS 已开通：
