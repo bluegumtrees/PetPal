@@ -1,20 +1,30 @@
 FROM python:3.12-slim AS base
 
+# 镜像源全部可配：默认官方源（海外机房直连最快），国内机房在 .env 里设
+#   APT_MIRROR=mirrors.aliyun.com
+#   PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple/
+#   HF_ENDPOINT=https://hf-mirror.com
+ARG APT_MIRROR=""
+ARG PIP_INDEX_URL=https://pypi.org/simple
+ARG HF_ENDPOINT=https://huggingface.co
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    HF_ENDPOINT=https://hf-mirror.com \
-    PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple/ \
+    HF_ENDPOINT=${HF_ENDPOINT} \
+    PIP_INDEX_URL=${PIP_INDEX_URL} \
     PIP_DEFAULT_TIMEOUT=600 \
     PIP_RETRIES=10 \
     TZ=Asia/Shanghai
 
 WORKDIR /app
 
-# 换 apt 源到阿里云镜像（国内 Debian 官方源慢）
-RUN if [ -f /etc/apt/sources.list.d/debian.sources ]; then \
-        sed -i 's|deb.debian.org|mirrors.aliyun.com|g; s|security.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources; \
-    elif [ -f /etc/apt/sources.list ]; then \
-        sed -i 's|deb.debian.org|mirrors.aliyun.com|g; s|security.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list; \
+# APT_MIRROR 非空时才换 apt 源（国内 Debian 官方源慢）
+RUN if [ -n "$APT_MIRROR" ]; then \
+        if [ -f /etc/apt/sources.list.d/debian.sources ]; then \
+            sed -i "s|deb.debian.org|$APT_MIRROR|g; s|security.debian.org|$APT_MIRROR|g" /etc/apt/sources.list.d/debian.sources; \
+        elif [ -f /etc/apt/sources.list ]; then \
+            sed -i "s|deb.debian.org|$APT_MIRROR|g; s|security.debian.org|$APT_MIRROR|g" /etc/apt/sources.list; \
+        fi; \
     fi
 
 # 系统依赖（sentence-transformers 需要 gcc，Pillow 需要 libjpeg）
@@ -22,7 +32,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential gcc libjpeg-dev zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Python 依赖（先拷 requirements.txt 利用 docker layer cache）
+# torch 单独从 PyTorch 的 CPU 索引装：PyPI 上的 torch 轮子（x86 和 ARM 都是）捆绑 CUDA 依赖，
+# 要多拉 3 到 4 GB 的 nvidia-* 包，纯 CPU 推理用不上。国内可设 TORCH_INDEX_URL=https://mirrors.aliyun.com/pytorch-wheels/cpu
+ARG TORCH_INDEX_URL=https://download.pytorch.org/whl/cpu
+RUN pip install --no-cache-dir --default-timeout=600 --retries 10 torch --index-url ${TORCH_INDEX_URL}
+
+# 其余 Python 依赖（先拷 requirements.txt 利用 docker layer cache；torch 已满足不会重装）
 COPY requirements.txt .
 RUN pip install --no-cache-dir --default-timeout=600 --retries 10 -r requirements.txt
 
