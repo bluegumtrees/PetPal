@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { api } from '../api'
 import { useAuth } from './AuthContext'
 
@@ -47,10 +47,18 @@ export function PetProvider({ children }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
+  // 用 ref 存当前选中 id，避免 reload 的闭包拿到过期值（否则跨账号对账失效）
+  const activePetIdRef = useRef(activePetId)
+
   const setActivePetId = useCallback((id) => {
+    activePetIdRef.current = id
     _setActivePetId(id)
-    if (id) localStorage.setItem(STORAGE_KEY, String(id))
-    else localStorage.removeItem(STORAGE_KEY)
+    try {
+      if (id) localStorage.setItem(STORAGE_KEY, String(id))
+      else localStorage.removeItem(STORAGE_KEY)
+    } catch {
+      /* 隐私模式 localStorage 不可写，忽略 */
+    }
   }, [])
 
   const reload = useCallback(async () => {
@@ -59,19 +67,21 @@ export function PetProvider({ children }) {
     try {
       const data = await api('/api/pets')
       setPets(data)
+      // 对账：localStorage 里存的 activePetId 可能来自同一浏览器的另一个账号
+      // （例如先登自己的号选了宠物，再用 /login?demo=1 进 demo）。
+      // 只要它不在当前账号的宠物列表里，就落到列表第一只，避免对别人的 pet 发请求拿 404。
+      const cur = activePetIdRef.current
       if (data.length === 0) {
         setActivePetId(null)
-      } else {
-        const stillExists = activePetId && data.some((p) => p.id === activePetId)
-        if (!stillExists) setActivePetId(data[0].id)
+      } else if (!data.some((p) => p.id === cur)) {
+        setActivePetId(data[0].id)
       }
     } catch (e) {
       setError(String(e.message || e))
     } finally {
       setLoading(false)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [setActivePetId])
 
   // V2: 仅在已登录时 fetch；切账号自动重新加载
   useEffect(() => {

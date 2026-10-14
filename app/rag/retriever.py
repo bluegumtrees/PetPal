@@ -14,7 +14,14 @@ from typing import Optional
 
 import jieba
 import chromadb
+import torch
 from sentence_transformers import SentenceTransformer, CrossEncoder
+
+# CPU 推理：把 intra-op 线程数拉到核数，CrossEncoder rerank 在 2 核 ARM 上提速明显
+try:
+    torch.set_num_threads(max(1, os.cpu_count() or 2))
+except Exception:  # noqa: BLE001
+    pass
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 CHROMA_DIR = ROOT / 'data' / 'chroma'
@@ -61,7 +68,9 @@ class VetRetriever:
     def _get_reranker(self) -> CrossEncoder:
         if self._reranker is None:
             print(f'[retriever] loading rerank model: {RERANK_MODEL}')
-            self._reranker = CrossEncoder(RERANK_MODEL)
+            # max_length=256：KB 正文中位 447 字（约 300 token），绝大多数不截断；
+            # 少数长条目截断对相关性排序影响可忽略，但显著缩短 CrossEncoder 序列、提速
+            self._reranker = CrossEncoder(RERANK_MODEL, max_length=256)
         return self._reranker
 
     # ---------- stage 1: dense ----------
@@ -161,10 +170,14 @@ class VetRetriever:
 
     # ---------- public ----------
 
-    def search(self, query: str, top_k: int = 5, fuse_n: int = 20,
+    def search(self, query: str, top_k: int = 5, fuse_n: int = 12,
                where: Optional[dict] = None,
                rerank: bool = True) -> list[dict]:
-        """主入口：三阶段检索。"""
+        """主入口：三阶段检索。
+
+        fuse_n=12（原 20）：rerank 要对 fuse_n 个候选逐个过 CrossEncoder，
+        12 个在 2 核 ARM 上约 5s（20 个约 12s），top_k≤5 时召回几乎不受影响。
+        """
         dense = self._dense_search(query, top_k=fuse_n, where=where)
         sparse = self._sparse_search(query, top_k=fuse_n, where=where)
         fused = self._rrf([dense, sparse])[:fuse_n]
